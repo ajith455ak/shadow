@@ -1,58 +1,71 @@
-# Shadow Nexus — Product Requirements Document
+# Shadow Nexus — Product Requirements Document (v2)
 
 ## Overview
-**Shadow Nexus** is a mobile-first, story-driven RPG where players become elite cyber operatives fighting *The Phantom Grid*, a rogue AI organization. The game blends cybersecurity education with classic RPG mechanics: progression, NPC conversations (AI-powered), turn-based cyber combat, inventory, skill tree, achievements, daily challenges, and a global leaderboard.
+**Shadow Nexus** is a mobile-first, story-driven RPG where players become elite cyber operatives fighting *The Phantom Grid*. Combines cybersecurity education with classic RPG mechanics PLUS authentic hacking simulation and living AI-driven NPCs.
 
 ## Tech Stack
-- **Frontend**: React Native + Expo (SDK 54), TypeScript, Expo Router (file-based)
+- **Frontend**: React Native + Expo (SDK 54), TypeScript, Expo Router
 - **Backend**: FastAPI + Motor (Async MongoDB)
-- **AI NPCs**: Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) via `emergentintegrations` + Emergent LLM Key
-- **Auth**: Custom JWT (bcrypt password hashing, Remember Me, Forgot Password reset token)
+- **AI**: Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`) via `emergentintegrations` + Emergent LLM Key
+- **Auth**: Custom JWT (bcrypt, Remember Me, Forgot Password)
 
-## Core Systems Implemented
-1. **Authentication** — register, login (with Remember Me 30-day token), forgot-password
-2. **Character Creation** — 22 futuristic avatars × 5 Cyber Classes with class-specific stats and bonuses
-3. **Dashboard HUD** — avatar, level, XP bar, coins, reputation, active mission, daily challenge progress, quick links
-4. **Story Mode** — 5 chapters (The Awakening, The Dark Network, The Phantom Grid, Digital War, Final Firewall) with sequential mission chains and level gating
-5. **Missions** — 12 missions across categories: Network Security, Web Security, Cryptography, Forensics, Social Engineering. Educational puzzles (port scan, SQL injection, Caesar cipher, phishing detection)
-6. **NPC System** — 5 NPCs (Commander Nova, Dr. Cipher, Ghost, BYTE, Shadow King), each with unique AI persona via Claude Sonnet 4.5. Conversation history persisted per user/NPC
-7. **Cyber Combat** — turn-based RPG with Exploit / Malware / Firewall (block) / Encrypt (heal) moves vs. boss enemies (5 chapter bosses)
-8. **Inventory & Equipment** — 10 items (tools, equipment, consumables) with rarity tiers (Common → Legendary). 3-slot equipment (head, body, tool)
-9. **Skill Tree** — 12 skills across 5 branches (Offensive, Defensive, Reverse Eng, Forensics, Cryptography). Prereqs, costs, skill points from leveling
-10. **Achievements** — 10 achievements with auto-trigger detection on mission completion / level / inventory milestones
-11. **Daily Challenges** — 3 per day, deterministically generated per user+date. Auto-tracked from missions/XP/boss/NPC chats
-12. **Leaderboard** — global ranking by level, total XP, reputation
+## Core Systems (v1)
+1. Authentication (register / login / forgot-password)
+2. Character Creation (22 avatars × 5 Cyber Classes)
+3. Dashboard HUD
+4. Story Mode — 5 chapters, 12 missions
+5. Educational mission puzzles (port scan, SQL injection, Caesar, phishing)
+6. Turn-based Cyber Combat (5 boss encounters)
+7. Inventory (10 items, 4 rarity tiers) & equipment slots
+8. Skill Tree — 12 skills × 5 branches
+9. Achievements (10) & Daily Challenges (3/day, deterministic)
+10. Global Leaderboard
 
-## Data Models (MongoDB)
-- `users` — auth credentials
-- `characters` — full game state (single doc per user)
-- `npc_conversations` — chat history per user+NPC
-- `password_resets` — reset tokens
+## New Systems (v2)
 
-## API Routes (all prefixed `/api`)
-- `/auth/*` — register, login, me, forgot-password
-- `/character` — CRUD; `/character/options` for avatar+class catalogs
-- `/dashboard` — aggregated HUD data
-- `/chapters`, `/chapters/{id}/missions`, `/missions/{id}`, `/missions/complete`
-- `/npcs`, `/npcs/{id}`, `/npcs/chat`, `/npcs/{id}/history`
-- `/inventory`, `/inventory/equip`, `/items`
-- `/skills`, `/skills/unlock`
-- `/achievements`
-- `/daily-challenges`
-- `/leaderboard`
-- `/combat/{mission_id}`
+### Real Hacking Mechanics
+- **`/hack-bay`** — choose from 3 hack targets (Helix Corp Perimeter, Dark Web Vault, Phantom Relay)
+- **Live terminal emulator** at `/hack/[id]` — type real cybersecurity commands:
+  - Reconnaissance: `nmap <ip>`, `ping <ip>`, `traceroute <ip>`, `map`
+  - Exploitation: `exploit <port>`, `ssh user@host`
+  - Filesystem: `ls`, `cat <file>`, `chmod`, `decrypt <token>`
+  - Special: `inject`, `brute-force`, `exfil`, `help`, `clear`
+- **4-stage progression bar**: Recon → Exploit → Priv-Esc → Exfil
+- **Trace meter** rises with noisy commands (visual risk indicator)
+- **Live network map** modal — nodes reveal as discovered, mark compromised in red
+- **Code Injection Puzzle** — pick correct line to complete real JavaScript/Python code
+- **Password Hash Cracker mini-game** — dictionary attack visualization with MD5 hash; pick or type guesses
+- **Faction-aware rewards** — hacking Helix Corp shifts ARIA trust −25, Jin trust +15, etc.
+- **Auto NPC reactions** — successful hacks push messages from BYTE / ARIA / etc to inbox
 
-## Design System
-- Dark cyberpunk base (`#030305`) with neon accents: cyan `#00F0FF`, green `#00FF41`, purple `#9D00FF`, amber `#FFB000`, red `#FF003C`
-- Square-edge UI (no rounded corners) for tactical aesthetic
-- Glassmorphism overlays, neon glow shadows, terminal-monospace typography
-- Background images: Nexus City, Cyber Academy, Dark Web Market
+### Living NPC System
+- **8 NPCs total** (3 new + 5 existing) — each with **unique portrait** (DiceBear bottts-neutral) and faction:
+  - Commander Nova · Shadow Nexus · ally
+  - Dr. Cipher · Cyber Academy · mentor
+  - Ghost · The Dark Network · ally
+  - BYTE · Shadow Nexus · companion
+  - **ARIA · Helix Corp · hostile rival** (NEW — Corp Security AI)
+  - **Jin · Helix Corp defector · informant** (NEW — rogue insider)
+  - **Vector · Crimson Syndicate · hostile rival** (NEW — black hat rival)
+  - Shadow King · The Phantom Grid · boss
+- **Per-NPC trust meter** (−100 … +100) shown on NPC list + dialogue header with bipolar bar
+- **Social Engineering** mechanic — `Flatter / Sympathize / Bargain / Threaten` approaches; outcomes depend on NPC personality + player's Social Engineering stat. Real Claude Sonnet 4.5 reaction line generated per attempt.
+- **Persistent conversation memory** — Claude session keyed by `(user_id, npc_id)` carries prior messages
+- **In-game Messenger inbox** (`/messenger`) — receives tip-offs, threats, info from NPCs; auto-triggered by hack completions and player progress. Color-coded priority pills (INFO / WARN / THREAT / TIP-OFF).
+
+## API (new endpoints)
+- `/api/hack/targets`, `/hack/start`, `/hack/{id}`, `/hack/cmd`, `/hack/{id}/puzzle`, `/hack/inject`, `/hack/{id}/crack-progress`, `/hack/crack`, `/hack/complete`
+- `/api/npcs/trust`, `/npcs/persuade`
+- `/api/messenger/inbox`, `/messenger/read`, `/messenger/seed-tipoffs`
+
+## Data Models
+- `users`, `characters` (extended with `npc_trust`, `npc_relations`)
+- `npc_conversations`, `password_resets`
+- `hack_sessions` (new) — full per-user hack state
+- `messages` (new) — NPC-to-player inbox
 
 ## Status
-- ✅ All core systems implemented and wired end-to-end
-- ✅ Backend reachable, auth flow works (smoke tested)
-- ✅ Login screen renders with cyberpunk aesthetic
-
-## Next Action Items
-- Run testing agent for full backend + frontend validation
-- Future: world map screen (locations as travel hub), more chapter content for ch3-5, in-app shop (Dark Web Market)
+- ✅ Backend: 39/39 (v1) + 21/21 (v2 hacking + NPCs + messenger) = **60/60 tests passing**
+- ✅ Real Claude Sonnet 4.5 dialogue + persuasion verified
+- ✅ Frontend wired: Hack Bay → Terminal with all 4 stages, network map modal, code injection modal, password cracker modal; Messenger inbox; NPC list with portraits + trust bars; Persuade modal in NPC dialogue
+- ✅ End-to-end hack chain validated: nmap → exploit → puzzle + crack → exfil → claim rewards → faction trust + NPC messages
