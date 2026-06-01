@@ -539,9 +539,34 @@ async def complete_mission(payload: MissionCompleteIn, user=Depends(get_current_
 
 
 # ---------- NPCs ----------
+from portrait_gen import generate_portrait_bytes  # noqa: E402
+import base64 as _b64  # noqa: E402
+
+
+async def _portrait_data_uri(npc_id: str) -> Optional[str]:
+    doc = await db.npc_portraits.find_one({"npc_id": npc_id}, {"_id": 0, "data": 1})
+    if doc and doc.get("data"):
+        # Detect mime from base64 prefix (JPEG vs PNG)
+        prefix = doc["data"][:4]
+        mime = "image/jpeg" if prefix.startswith("/9j") else "image/png"
+        return f"data:{mime};base64,{doc['data']}"
+    return None
+
+
+def _attach_portrait(npc_dict: Dict[str, Any], data_uri: Optional[str]) -> Dict[str, Any]:
+    out = {k: v for k, v in npc_dict.items() if k != "system_prompt"}
+    if data_uri:
+        out["portrait"] = data_uri
+    return out
+
+
 @api.get("/npcs")
 async def list_npcs():
-    return [{k: v for k, v in n.items() if k != "system_prompt"} for n in NPCS]
+    out = []
+    for n in NPCS:
+        data_uri = await _portrait_data_uri(n["id"])
+        out.append(_attach_portrait(n, data_uri))
+    return out
 
 
 @api.get("/npcs/trust")
@@ -552,12 +577,50 @@ async def npcs_trust_pre(user=Depends(get_current_user)):
     return {"trust": char.get("npc_trust", {})}
 
 
+@api.post("/npcs/generate-portraits")
+async def generate_portraits():
+    """Generate anime-style portraits for every NPC (cached idempotent)."""
+    results: Dict[str, str] = {}
+    for n in NPCS:
+        existing = await db.npc_portraits.find_one({"npc_id": n["id"]}, {"_id": 0, "npc_id": 1})
+        if existing:
+            results[n["id"]] = "cached"
+            continue
+        png = await generate_portrait_bytes(n["id"])
+        if png is None:
+            results[n["id"]] = "failed"
+            continue
+        await db.npc_portraits.update_one(
+            {"npc_id": n["id"]},
+            {"$set": {"npc_id": n["id"], "data": _b64.b64encode(png).decode("ascii")}},
+            upsert=True,
+        )
+        results[n["id"]] = "generated"
+    return {"results": results}
+
+
+@api.post("/npcs/regenerate-portrait/{npc_id}")
+async def regenerate_portrait(npc_id: str):
+    if not any(n["id"] == npc_id for n in NPCS):
+        raise HTTPException(status_code=404, detail="NPC not found")
+    png = await generate_portrait_bytes(npc_id)
+    if png is None:
+        raise HTTPException(status_code=500, detail="Generation failed")
+    await db.npc_portraits.update_one(
+        {"npc_id": npc_id},
+        {"$set": {"npc_id": npc_id, "data": _b64.b64encode(png).decode("ascii")}},
+        upsert=True,
+    )
+    return {"ok": True, "npc_id": npc_id}
+
+
 @api.get("/npcs/{npc_id}")
 async def get_npc(npc_id: str):
     npc = next((n for n in NPCS if n["id"] == npc_id), None)
     if not npc:
         raise HTTPException(status_code=404, detail="NPC not found")
-    return {k: v for k, v in npc.items() if k != "system_prompt"}
+    data_uri = await _portrait_data_uri(npc_id)
+    return _attach_portrait(npc, data_uri)
 
 
 @api.post("/npcs/chat")
@@ -947,15 +1010,16 @@ async def _push_message(user_id: str, *, sender_npc: str, text: str, priority: s
     npc = next((n for n in NPCS if n["id"] == sender_npc), None)
     if not npc:
         return
+    portrait = await _portrait_data_uri(sender_npc) or npc.get("portrait")
     await db.messages.insert_one({
         "id": str(uuid.uuid4()),
         "user_id": user_id,
         "sender_npc": sender_npc,
         "sender_name": npc["name"],
         "sender_color": npc["color"],
-        "sender_portrait": npc.get("portrait"),
+        "sender_portrait": portrait,
         "text": text,
-        "priority": priority,  # 'info' | 'warning' | 'threat' | 'tipoff'
+        "priority": priority,
         "read": False,
         "created_at": utcnow().isoformat(),
     })
