@@ -86,6 +86,30 @@ class NPCChatIn(BaseModel):
     message: str
 
 
+class PersuadeIn(BaseModel):
+    npc_id: str
+    approach: str  # 'flatter' | 'threaten' | 'bargain' | 'sympathize'
+
+
+class HackStartIn(BaseModel):
+    target: Optional[str] = None  # optional target name; otherwise random
+
+
+class HackCmdIn(BaseModel):
+    session_id: str
+    command: str
+
+
+class HackCrackIn(BaseModel):
+    session_id: str
+    guess: str  # password guess for cracker mini-game
+
+
+class HackInjectIn(BaseModel):
+    session_id: str
+    answer: str  # code injection answer
+
+
 class SkillUnlockIn(BaseModel):
     skill_id: str
 
@@ -520,6 +544,14 @@ async def list_npcs():
     return [{k: v for k, v in n.items() if k != "system_prompt"} for n in NPCS]
 
 
+@api.get("/npcs/trust")
+async def npcs_trust_pre(user=Depends(get_current_user)):
+    char = await db.characters.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not char:
+        raise HTTPException(status_code=404, detail="No character")
+    return {"trust": char.get("npc_trust", {})}
+
+
 @api.get("/npcs/{npc_id}")
 async def get_npc(npc_id: str):
     npc = next((n for n in NPCS if n["id"] == npc_id), None)
@@ -751,6 +783,288 @@ async def combat_setup(mission_id: str, user=Depends(get_current_user)):
             {"id": "encrypt", "name": "Encrypt Shield", "icon": "lock-closed", "damage": 0, "color": "#00F0FF", "desc": "Heal 30 HP"},
         ],
     }
+
+
+# ---------- Hacking Terminal ----------
+from hack_engine import (  # noqa: E402
+    HACK_TARGETS, STAGES, STAGE_LABELS, new_session, handle_command,
+    attempt_crack, get_code_puzzle, check_code_answer, crack_progress_lines,
+)
+
+
+@api.get("/hack/targets")
+async def hack_targets():
+    return {"targets": HACK_TARGETS, "stages": [{"id": s, "label": STAGE_LABELS[s]} for s in STAGES]}
+
+
+@api.post("/hack/start")
+async def hack_start(payload: HackStartIn, user=Depends(get_current_user)):
+    char = await db.characters.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not char:
+        raise HTTPException(status_code=404, detail="No character")
+    sess = new_session(user["id"], char["name"], payload.target)
+    await db.hack_sessions.insert_one(sess.copy())
+    return _strip(sess)
+
+
+@api.get("/hack/{session_id}")
+async def hack_get(session_id: str, user=Depends(get_current_user)):
+    sess = await db.hack_sessions.find_one({"id": session_id, "user_id": user["id"]}, {"_id": 0})
+    if not sess:
+        raise HTTPException(status_code=404, detail="Hack session not found")
+    return _strip(sess)
+
+
+@api.post("/hack/cmd")
+async def hack_cmd(payload: HackCmdIn, user=Depends(get_current_user)):
+    sess = await db.hack_sessions.find_one({"id": payload.session_id, "user_id": user["id"]}, {"_id": 0})
+    if not sess:
+        raise HTTPException(status_code=404, detail="Hack session not found")
+    out_lines, patch = handle_command(sess, payload.command)
+    # Append new history
+    new_hist = list(sess.get("history", [])) + out_lines
+    new_hist = new_hist[-200:]  # cap
+    update = {"history": new_hist, **patch}
+    if "history" in patch and patch["history"] == []:
+        update["history"] = []
+    await db.hack_sessions.update_one({"id": sess["id"]}, {"$set": update})
+    sess.update(update)
+    return _strip(sess)
+
+
+@api.post("/hack/crack")
+async def hack_crack(payload: HackCrackIn, user=Depends(get_current_user)):
+    sess = await db.hack_sessions.find_one({"id": payload.session_id, "user_id": user["id"]}, {"_id": 0})
+    if not sess:
+        raise HTTPException(status_code=404, detail="Hack session not found")
+    ok, msg = attempt_crack(sess, payload.guess)
+    new_hist = list(sess.get("history", [])) + [{"output": msg, "kind": "success" if ok else "error"}]
+    update: Dict[str, Any] = {"history": new_hist[-200:]}
+    if ok:
+        update["password_cracked"] = True
+        if sess.get("exploit_success") and sess.get("code_puzzle_solved"):
+            update["stage"] = "exfil"
+            update["stage_index"] = 3
+            new_hist.append({"output": "[+] PRIVILEGE ESCALATION COMPLETE — proceed to EXFIL stage.", "kind": "success"})
+            new_hist.append({"output": "[*] Type: exfil  — to extract the vault payload.", "kind": "hint"})
+            update["history"] = new_hist[-200:]
+    await db.hack_sessions.update_one({"id": sess["id"]}, {"$set": update})
+    sess.update(update)
+    return {"ok": ok, "message": msg, "session": _strip(sess)}
+
+
+@api.get("/hack/{session_id}/crack-progress")
+async def hack_crack_progress(session_id: str, user=Depends(get_current_user)):
+    sess = await db.hack_sessions.find_one({"id": session_id, "user_id": user["id"]}, {"_id": 0})
+    if not sess:
+        raise HTTPException(status_code=404, detail="Hack session not found")
+    return {"lines": crack_progress_lines(sess), "hash": sess["pw_hash"]}
+
+
+@api.get("/hack/{session_id}/puzzle")
+async def hack_puzzle(session_id: str, user=Depends(get_current_user)):
+    sess = await db.hack_sessions.find_one({"id": session_id, "user_id": user["id"]}, {"_id": 0})
+    if not sess:
+        raise HTTPException(status_code=404, detail="Hack session not found")
+    return get_code_puzzle(sess)
+
+
+@api.post("/hack/inject")
+async def hack_inject(payload: HackInjectIn, user=Depends(get_current_user)):
+    sess = await db.hack_sessions.find_one({"id": payload.session_id, "user_id": user["id"]}, {"_id": 0})
+    if not sess:
+        raise HTTPException(status_code=404, detail="Hack session not found")
+    correct = check_code_answer(sess, payload.answer)
+    line = "[+] Injection accepted. Privilege chain extended." if correct else "[-] Injection rejected. Syntax check failed."
+    new_hist = list(sess.get("history", [])) + [{"output": line, "kind": "success" if correct else "error"}]
+    update: Dict[str, Any] = {"history": new_hist[-200:]}
+    if correct:
+        update["code_puzzle_solved"] = True
+        if sess.get("exploit_success") and sess.get("password_cracked"):
+            update["stage"] = "exfil"
+            update["stage_index"] = 3
+            new_hist.append({"output": "[+] PRIVILEGE ESCALATION COMPLETE — proceed to EXFIL.", "kind": "success"})
+            update["history"] = new_hist[-200:]
+    await db.hack_sessions.update_one({"id": sess["id"]}, {"$set": update})
+    sess.update(update)
+    return {"ok": correct, "session": _strip(sess)}
+
+
+@api.post("/hack/complete")
+async def hack_complete(payload: HackStartIn, user=Depends(get_current_user)):
+    """Claim rewards once exfil_complete is true. payload.target = session_id."""
+    sess = await db.hack_sessions.find_one({"id": payload.target, "user_id": user["id"]}, {"_id": 0})
+    if not sess:
+        raise HTTPException(status_code=404, detail="Hack session not found")
+    if not sess.get("exfil_complete"):
+        raise HTTPException(status_code=400, detail="Exfiltration not complete")
+    if sess.get("claimed"):
+        raise HTTPException(status_code=400, detail="Rewards already claimed")
+    char = await db.characters.find_one({"user_id": user["id"]}, {"_id": 0})
+    xp = sess["target"]["reward_xp"]
+    coins = sess["target"]["reward_coins"]
+    char["coins"] = char.get("coins", 0) + coins
+    level_info = apply_xp(char, xp)
+    # Award trust changes based on faction
+    faction = sess["target"]["faction"]
+    char.setdefault("npc_trust", {})
+    if faction == "Helix Corp":
+        char["npc_trust"]["aria"] = char["npc_trust"].get("aria", 0) - 25
+        char["npc_trust"]["jin"] = char["npc_trust"].get("jin", 0) + 15
+    elif faction == "Crimson Syndicate":
+        char["npc_trust"]["vector"] = char["npc_trust"].get("vector", 0) - 30
+    elif faction == "The Phantom Grid":
+        char["npc_trust"]["shadow_king"] = char["npc_trust"].get("shadow_king", 0) - 20
+        char["npc_trust"]["nova"] = char["npc_trust"].get("nova", 0) + 20
+
+    # Drop an in-game message
+    await _push_message(user["id"], sender_npc="byte",
+                       text=f"Nice work jacking {sess['target']['name']}. +{xp} XP, +{coins} CR. The grid noticed.",
+                       priority="info")
+    if faction == "Helix Corp":
+        await _push_message(user["id"], sender_npc="aria",
+                           text=f"Anomaly logged. Your signature is now in our priority watch list, {char['name']}. We will speak again.",
+                           priority="threat")
+    await db.characters.update_one({"user_id": user["id"]}, {"$set": char})
+    await db.hack_sessions.update_one({"id": sess["id"]}, {"$set": {"claimed": True}})
+    return {
+        "success": True,
+        "xp_gained": xp,
+        "coins_gained": coins,
+        "leveled_up": level_info["leveled_up"],
+        "new_level": level_info["new_level"],
+        "trust_changes": char.get("npc_trust", {}),
+    }
+
+
+def _strip(sess: Dict[str, Any]) -> Dict[str, Any]:
+    out = {k: v for k, v in sess.items() if k not in ("_id", "pw_plain")}
+    return out
+
+
+# ---------- Messenger ----------
+async def _push_message(user_id: str, *, sender_npc: str, text: str, priority: str = "info") -> None:
+    npc = next((n for n in NPCS if n["id"] == sender_npc), None)
+    if not npc:
+        return
+    await db.messages.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "sender_npc": sender_npc,
+        "sender_name": npc["name"],
+        "sender_color": npc["color"],
+        "sender_portrait": npc.get("portrait"),
+        "text": text,
+        "priority": priority,  # 'info' | 'warning' | 'threat' | 'tipoff'
+        "read": False,
+        "created_at": utcnow().isoformat(),
+    })
+
+
+@api.get("/messenger/inbox")
+async def messenger_inbox(user=Depends(get_current_user)):
+    cursor = db.messages.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).limit(50)
+    items = await cursor.to_list(50)
+    return {"messages": items, "unread": sum(1 for m in items if not m.get("read"))}
+
+
+@api.post("/messenger/read")
+async def messenger_read(user=Depends(get_current_user)):
+    await db.messages.update_many({"user_id": user["id"], "read": False}, {"$set": {"read": True}})
+    return {"success": True}
+
+
+@api.post("/messenger/seed-tipoffs")
+async def messenger_seed(user=Depends(get_current_user)):
+    """Drop a couple of fresh tip-offs from NPCs for the player."""
+    char = await db.characters.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not char:
+        raise HTTPException(status_code=404, detail="No character")
+    await _push_message(user["id"], sender_npc="jin",
+                       text=f"Heads up, {char['name']}. Helix is pushing a new patch tonight. Window opens at 02:00. Don't waste it.",
+                       priority="tipoff")
+    await _push_message(user["id"], sender_npc="vector",
+                       text="Cute level. I just hit Phantom relay #14 in under 90 seconds. Catch up or stay sidelined.",
+                       priority="threat")
+    await _push_message(user["id"], sender_npc="cipher",
+                       text="Remember — the network teaches what books cannot. Trace every packet like a breadcrumb home.",
+                       priority="info")
+    return {"success": True}
+
+
+# ---------- NPC Trust / Persuasion ----------
+PERSUADE_OUTCOMES = {
+    "ally": {
+        "flatter": +6,
+        "sympathize": +8,
+        "bargain": +3,
+        "threaten": -10,
+    },
+    "mentor": {"flatter": +3, "sympathize": +5, "bargain": +2, "threaten": -8},
+    "informant": {"flatter": +4, "sympathize": +9, "bargain": +6, "threaten": -12},
+    "companion": {"flatter": +10, "sympathize": +6, "bargain": +2, "threaten": -15},
+    "rival": {"flatter": -3, "sympathize": -1, "bargain": +4, "threaten": +2},
+    "boss": {"flatter": -5, "sympathize": -3, "bargain": -1, "threaten": +1},
+}
+
+
+@api.post("/npcs/persuade")
+async def npc_persuade(payload: PersuadeIn, user=Depends(get_current_user)):
+    npc = next((n for n in NPCS if n["id"] == payload.npc_id), None)
+    if not npc:
+        raise HTTPException(status_code=404, detail="NPC not found")
+    if payload.approach not in ("flatter", "threaten", "bargain", "sympathize"):
+        raise HTTPException(status_code=400, detail="Invalid approach")
+    char = await db.characters.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not char:
+        raise HTTPException(status_code=404, detail="No character")
+    table = PERSUADE_OUTCOMES.get(npc.get("tag", "ally"), PERSUADE_OUTCOMES["ally"])
+    delta = table[payload.approach]
+    # Skill check: social engineering stat modifier
+    social = char.get("stats", {}).get("social_engineering", 5)
+    if delta > 0:
+        delta += (social - 5) // 2
+    char.setdefault("npc_trust", {})
+    cur = char["npc_trust"].get(npc["id"], 0)
+    new_val = max(-100, min(100, cur + delta))
+    char["npc_trust"][npc["id"]] = new_val
+    await db.characters.update_one({"user_id": user["id"]}, {"$set": {"npc_trust": char["npc_trust"]}})
+
+    # Generate reaction line via LLM
+    klass = next((c for c in CYBER_CLASSES if c["id"] == char["cyber_class"]), CYBER_CLASSES[0])
+    sys_prompt = (
+        npc["system_prompt"]
+        + f"\n\nThe player ({char['name']}, {klass['name']}) just attempted to {payload.approach} you. "
+        f"Current trust toward player: {new_val} of 100. "
+        f"Respond in-character to this attempt. ONE short line, max 2 sentences."
+    )
+    reply = "..."
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"persuade-{user['id']}-{npc['id']}-{uuid.uuid4().hex[:6]}",
+            system_message=sys_prompt,
+        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+        reply = await chat.send_message(UserMessage(text=f"[Player chose: {payload.approach}]"))
+    except Exception as e:
+        log.warning("Persuade LLM fail: %s", e)
+        reply = "[static]"
+
+    return {
+        "approach": payload.approach,
+        "delta": delta,
+        "trust": new_val,
+        "reaction": str(reply),
+    }
+
+
+@api.get("/npcs/trust")
+async def npcs_trust(user=Depends(get_current_user)):
+    char = await db.characters.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not char:
+        raise HTTPException(status_code=404, detail="No character")
+    return {"trust": char.get("npc_trust", {})}
 
 
 # Include router & middleware

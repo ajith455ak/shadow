@@ -1,15 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView,
-  StyleSheet, TextInput, View,
+  ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform,
+  Pressable, ScrollView, StyleSheet, TextInput, View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, FONT } from "@/src/theme";
 import { api } from "@/src/api/client";
-import { MonoText, MutedText, NeonLabel, TitleText } from "@/src/components/Typography";
+import { MonoText, MutedText, NeonLabel } from "@/src/components/Typography";
+import { NeonButton } from "@/src/components/NeonButton";
 
 type Msg = { role: "user" | "assistant"; content: string; ts?: string };
+
+const APPROACHES = [
+  { id: "flatter", label: "Flatter", color: COLORS.cyan, icon: "happy" },
+  { id: "sympathize", label: "Sympathize", color: COLORS.green, icon: "heart" },
+  { id: "bargain", label: "Bargain", color: COLORS.amber, icon: "swap-horizontal" },
+  { id: "threaten", label: "Threaten", color: COLORS.red, icon: "warning" },
+];
 
 export default function NPCDialogue() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -18,6 +26,10 @@ export default function NPCDialogue() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [trust, setTrust] = useState(0);
+  const [showPersuade, setShowPersuade] = useState(false);
+  const [persuadeBusy, setPersuadeBusy] = useState(false);
+  const [persuadeResult, setPersuadeResult] = useState<{ delta: number; trust: number; reaction: string } | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -25,7 +37,11 @@ export default function NPCDialogue() {
       try {
         const n = await api.get<any>(`/npcs/${id}`);
         setNpc(n);
-        const hist = await api.get<{ messages: Msg[] }>(`/npcs/${id}/history`);
+        const [hist, t] = await Promise.all([
+          api.get<{ messages: Msg[] }>(`/npcs/${id}/history`),
+          api.get<{ trust: Record<string, number> }>(`/npcs/trust`),
+        ]);
+        setTrust(t.trust?.[id as string] ?? 0);
         if (hist.messages?.length) {
           setMessages(hist.messages);
         } else {
@@ -37,28 +53,40 @@ export default function NPCDialogue() {
 
   const send = async (text: string) => {
     if (!text.trim() || sending) return;
-    const userMsg: Msg = { role: "user", content: text };
-    setMessages((m) => [...m, userMsg]);
+    setMessages((m) => [...m, { role: "user", content: text }]);
     setInput("");
     setSending(true);
     try {
       const res = await api.post<{ reply: string }>("/npcs/chat", { npc_id: id, message: text });
       setMessages((m) => [...m, { role: "assistant", content: res.reply }]);
-    } catch (e: any) {
-      setMessages((m) => [...m, { role: "assistant", content: "[Connection lost. Static interference.]" }]);
+    } catch {
+      setMessages((m) => [...m, { role: "assistant", content: "[Channel disrupted.]" }]);
     } finally {
       setSending(false);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     }
   };
 
+  const persuade = async (approach: string) => {
+    setPersuadeBusy(true);
+    setPersuadeResult(null);
+    try {
+      const r = await api.post<any>("/npcs/persuade", { npc_id: id, approach });
+      setTrust(r.trust);
+      setPersuadeResult({ delta: r.delta, trust: r.trust, reaction: r.reaction });
+      setMessages((m) => [
+        ...m,
+        { role: "user", content: `[Approach: ${approach}]` },
+        { role: "assistant", content: r.reaction },
+      ]);
+    } catch { /* noop */ }
+    finally { setPersuadeBusy(false); }
+  };
+
   if (!npc) return <View style={styles.root}><MutedText style={{ padding: 24 }}>Connecting...</MutedText></View>;
 
-  const quickReplies = [
-    "What's the situation?",
-    "Brief me on the Phantom Grid.",
-    "Any tips for a new operative?",
-  ];
+  const trustCol = trust >= 30 ? COLORS.green : trust <= -30 ? COLORS.red : COLORS.amber;
+  const quickReplies = ["What's the situation?", "Brief me on the Phantom Grid.", "Any leads on Helix Corp?"];
 
   return (
     <View style={styles.root}>
@@ -67,11 +95,23 @@ export default function NPCDialogue() {
           <Ionicons name="chevron-back" size={24} color={COLORS.cyan} />
         </Pressable>
         <View style={[styles.portrait, { borderColor: npc.color, shadowColor: npc.color }]}>
-          <Ionicons name={npc.icon as any} size={28} color={npc.color} />
+          {npc.portrait ? (
+            <Image source={{ uri: npc.portrait }} style={styles.portraitImg} />
+          ) : (
+            <Ionicons name={npc.icon as any} size={28} color={npc.color} />
+          )}
         </View>
         <View style={{ flex: 1, marginLeft: 12 }}>
           <MonoText style={{ color: npc.color, fontSize: 13, fontWeight: "700" }}>{npc.name}</MonoText>
-          <MutedText style={{ fontSize: 10 }}>{npc.role}</MutedText>
+          <MutedText style={{ fontSize: 10 }}>{npc.role} · {npc.faction}</MutedText>
+          <View style={styles.trustRow}>
+            <MonoText style={{ color: COLORS.textMuted, fontSize: 9 }}>TRUST</MonoText>
+            <View style={styles.trustBg}>
+              <View style={styles.trustAxis} />
+              <View style={[styles.trustFill, { backgroundColor: trustCol, width: `${Math.abs(trust) / 2}%`, left: trust >= 0 ? "50%" : `${50 - Math.abs(trust) / 2}%` }]} />
+            </View>
+            <MonoText style={{ color: trustCol, fontSize: 10 }}>{trust > 0 ? "+" : ""}{trust}</MonoText>
+          </View>
         </View>
       </View>
 
@@ -101,11 +141,18 @@ export default function NPCDialogue() {
       </ScrollView>
 
       <View style={styles.quickRow}>
-        {quickReplies.map((q) => (
-          <Pressable key={q} testID={`quick-${q.slice(0, 6)}`} onPress={() => send(q)} style={[styles.quickReply, { borderColor: npc.color }]}>
-            <MonoText style={{ color: npc.color, fontSize: 11 }} numberOfLines={1}>{q}</MonoText>
+        {quickReplies.map((q, i) => (
+          <Pressable key={i} testID={`quick-${i}`} onPress={() => send(q)} style={[styles.quickReply, { borderColor: npc.color }]}>
+            <MonoText style={{ color: npc.color, fontSize: 10 }} numberOfLines={1}>{q}</MonoText>
           </Pressable>
         ))}
+      </View>
+
+      <View style={styles.engineerBar}>
+        <Pressable testID="open-persuade" onPress={() => setShowPersuade(true)} style={styles.engineerBtn}>
+          <Ionicons name="people" size={14} color={COLORS.purple} />
+          <MonoText style={{ color: COLORS.purple, fontSize: 10, marginLeft: 6 }}>SOCIAL ENGINEER</MonoText>
+        </Pressable>
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -125,6 +172,45 @@ export default function NPCDialogue() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      <Modal visible={showPersuade} transparent animationType="fade" onRequestClose={() => setShowPersuade(false)}>
+        <Pressable style={styles.modalBg} onPress={() => setShowPersuade(false)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <NeonLabel color={COLORS.purple}>SOCIAL ENGINEERING</NeonLabel>
+              <Pressable onPress={() => setShowPersuade(false)}><Ionicons name="close" size={22} color={COLORS.textSecondary} /></Pressable>
+            </View>
+            <MutedText style={{ marginVertical: 10, fontSize: 12 }}>
+              Pick an approach. Outcomes depend on {npc.name}'s personality, current trust, and your Social Engineering stat.
+            </MutedText>
+            <View style={styles.approachGrid}>
+              {APPROACHES.map((a) => (
+                <Pressable
+                  key={a.id}
+                  testID={`approach-${a.id}`}
+                  disabled={persuadeBusy}
+                  onPress={() => persuade(a.id)}
+                  style={[styles.approachBtn, { borderColor: a.color, opacity: persuadeBusy ? 0.5 : 1 }]}
+                >
+                  <Ionicons name={a.icon as any} size={20} color={a.color} />
+                  <MonoText style={{ color: a.color, fontSize: 11, marginTop: 6, fontWeight: "700" }}>{a.label.toUpperCase()}</MonoText>
+                </Pressable>
+              ))}
+            </View>
+            {persuadeBusy ? <ActivityIndicator color={COLORS.purple} style={{ marginTop: 14 }} /> : null}
+            {persuadeResult ? (
+              <View style={{ marginTop: 14 }}>
+                <MonoText style={{ color: persuadeResult.delta >= 0 ? COLORS.green : COLORS.red, fontSize: 12 }}>
+                  TRUST {persuadeResult.delta >= 0 ? "+" : ""}{persuadeResult.delta} → {persuadeResult.trust}
+                </MonoText>
+                <MonoText style={{ color: COLORS.textPrimary, fontSize: 12, marginTop: 8, lineHeight: 18, fontStyle: "italic" }}>
+                  "{persuadeResult.reaction}"
+                </MonoText>
+              </View>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -136,15 +222,27 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, backgroundColor: COLORS.surface,
   },
   portrait: {
-    width: 44, height: 44, borderWidth: 2, alignItems: "center", justifyContent: "center",
-    backgroundColor: COLORS.surfaceElevated, shadowOpacity: 0.6, shadowRadius: 8, marginLeft: 12,
+    width: 56, height: 56, borderWidth: 2, alignItems: "center", justifyContent: "center",
+    backgroundColor: COLORS.surfaceElevated, shadowOpacity: 0.6, shadowRadius: 8, marginLeft: 12, overflow: "hidden",
   },
+  portraitImg: { width: 56, height: 56 },
+  trustRow: { flexDirection: "row", alignItems: "center", marginTop: 6, gap: 6 },
+  trustBg: { flex: 1, height: 5, backgroundColor: COLORS.surfaceElevated, position: "relative", overflow: "hidden" },
+  trustAxis: { position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, backgroundColor: COLORS.textMuted },
+  trustFill: { position: "absolute", top: 0, bottom: 0 },
   chat: { flex: 1 },
   msgRow: { marginBottom: 12 },
   bubble: { padding: 12, borderWidth: 1, maxWidth: "85%" },
   quickRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, padding: 8 },
   quickReply: { borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, maxWidth: "32%" },
+  engineerBar: { paddingHorizontal: 8, paddingBottom: 4 },
+  engineerBtn: { flexDirection: "row", alignItems: "center", paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: "rgba(157,0,255,0.4)", alignSelf: "flex-start" },
   inputRow: { flexDirection: "row", alignItems: "center", borderTopWidth: 1, padding: 8, backgroundColor: COLORS.surface },
   input: { flex: 1, color: COLORS.textPrimary, fontFamily: FONT.body, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
   sendBtn: { padding: 10 },
+  modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", padding: 20 },
+  modalCard: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.purple, padding: 18 },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  approachGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
+  approachBtn: { flexBasis: "48%", padding: 14, borderWidth: 1, alignItems: "center", backgroundColor: COLORS.surfaceElevated, minHeight: 80, justifyContent: "center" },
 });

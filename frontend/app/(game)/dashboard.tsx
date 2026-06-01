@@ -103,6 +103,14 @@ export default function Dashboard() {
       )}
 
       <View style={styles.quickGrid}>
+        <Pressable testID="quick-hack" style={styles.quickBtn} onPress={() => router.push("/hack-bay")}>
+          <Ionicons name="terminal" size={22} color={COLORS.green} />
+          <MonoText style={styles.quickLabel}>Hack</MonoText>
+        </Pressable>
+        <Pressable testID="quick-messenger" style={styles.quickBtn} onPress={() => router.push("/messenger")}>
+          <Ionicons name="mail" size={22} color={COLORS.green} />
+          <MonoText style={styles.quickLabel}>Inbox</MonoText>
+        </Pressable>
         <Pressable testID="quick-story" style={styles.quickBtn} onPress={() => router.push("/story")}>
           <Ionicons name="git-network" size={22} color={COLORS.cyan} />
           <MonoText style={styles.quickLabel}>Story</MonoText>
