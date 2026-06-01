@@ -231,8 +231,7 @@ async def check_achievements(char: Dict[str, Any]) -> List[str]:
         if ok:
             new_awards.append(ach["id"])
             char.setdefault("achievements", []).append(ach["id"])
-            char["xp"] = char.get("xp", 0) + ach["xp"]
-            char["total_xp"] = char.get("total_xp", 0) + ach["xp"]
+            apply_xp(char, ach["xp"])
     return new_awards
 
 
