@@ -5,7 +5,7 @@ import time
 import pytest
 import requests
 
-BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://phantom-grid.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("BACKEND_URL", os.environ.get("EXPO_PUBLIC_BACKEND_URL", "http://localhost:8001")).rstrip("/")
 API = f"{BASE_URL}/api"
 
 
@@ -25,7 +25,15 @@ def user_ctx(session):
     payload = {"username": f"tu_{suffix}", "email": email, "password": "password123"}
     r = session.post(f"{API}/auth/register", json=payload, timeout=30)
     assert r.status_code == 200, r.text
-    token = r.json()["token"]
+    data = r.json()
+    v_token = data.get("verification_token_demo")
+    if v_token:
+        v_res = session.post(f"{API}/auth/verify-email", json={
+            "email": email,
+            "token": v_token
+        })
+        assert v_res.status_code == 200, v_res.text
+    token = data["token"]
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     # Create character
     cc = session.post(
@@ -34,7 +42,7 @@ def user_ctx(session):
         headers=headers, timeout=30,
     )
     assert cc.status_code == 200, cc.text
-    return {"token": token, "headers": headers, "email": email, "user_id": r.json()["user"]["id"]}
+    return {"token": token, "headers": headers, "email": email, "user_id": data["user"]["id"]}
 
 
 # ---------- previous endpoints regression ----------
@@ -162,7 +170,7 @@ class TestHack:
         r = session.get(f"{API}/hack/targets")
         assert r.status_code == 200
         d = r.json()
-        assert len(d["targets"]) == 3
+        assert len(d["targets"]) == 6
         labels = {s["id"] for s in d["stages"]}
         assert labels == {"recon", "exploit", "privesc", "exfil"}
 
@@ -214,11 +222,11 @@ class TestHack:
         bad = session.post(f"{API}/hack/inject",
                           json={"session_id": sid, "answer": "console.log(1)"}, headers=h)
         assert bad.status_code == 200 and bad.json()["ok"] is False
-        # Correct answer
-        good = session.post(f"{API}/hack/inject",
-                           json={"session_id": sid, "answer": correct}, headers=h)
-        assert good.status_code == 200 and good.json()["ok"] is True
-        assert good.json()["session"]["code_puzzle_solved"] is True
+        # Correct answer via terminal inject command
+        good = session.post(f"{API}/hack/cmd",
+                           json={"session_id": sid, "command": f"inject {correct}"}, headers=h)
+        assert good.status_code == 200
+        assert good.json()["code_puzzle_solved"] is True
 
         # crack progress
         cp = session.get(f"{API}/hack/{sid}/crack-progress", headers=h)
@@ -245,7 +253,7 @@ class TestHack:
 
         # Complete should fail before exfil
         cf = session.post(f"{API}/hack/complete",
-                         json={"target": sid}, headers=h)
+                         json={"session_id": sid}, headers=h)
         assert cf.status_code == 400
 
         # exfil command
@@ -261,7 +269,7 @@ class TestHack:
 
         # complete
         ok = session.post(f"{API}/hack/complete",
-                        json={"target": sid}, headers=h)
+                        json={"session_id": sid}, headers=h)
         assert ok.status_code == 200, ok.text
         data = ok.json()
         assert data["xp_gained"] == 350 and data["coins_gained"] == 200
@@ -273,7 +281,7 @@ class TestHack:
 
         # cannot claim twice
         again = session.post(f"{API}/hack/complete",
-                            json={"target": sid}, headers=h)
+                            json={"session_id": sid}, headers=h)
         assert again.status_code == 400
 
         # Inbox should have BYTE celebration + ARIA threat
@@ -287,8 +295,39 @@ class TestHack:
         r = session.post(f"{API}/hack/start", json={"target": "phantom_relay"}, headers=h)
         sid = r.json()["id"]
         ip = r.json()["target"]["ip"]
-        for cmd in ["help", f"ping {ip}", f"traceroute {ip}", "ls", "cat .bash_history",
+        for cmd in ["help", "tutorial", f"ping {ip}", f"traceroute {ip}", "ls", "cat .bash_history",
                     "chmod 777 file", "map", "decrypt abcXYZ", "clear"]:
             rr = session.post(f"{API}/hack/cmd",
                              json={"session_id": sid, "command": cmd}, headers=h)
             assert rr.status_code == 200, f"Command {cmd} failed: {rr.text}"
+
+    def test_sql_injector_target_and_puzzle(self, session, user_ctx):
+        h = user_ctx["headers"]
+        r = session.post(f"{API}/hack/start", json={"target": "secure_sql_injector"}, headers=h)
+        assert r.status_code == 200
+        sess = r.json()
+        sid = sess["id"]
+        assert sess["target"]["id"] == "secure_sql_injector"
+        ip = sess["target"]["ip"]
+
+        r = session.post(f"{API}/hack/cmd", json={"session_id": sid, "command": f"nmap {ip}"}, headers=h)
+        assert r.status_code == 200
+        assert r.json()["stage"] == "exploit"
+
+        r = session.post(f"{API}/hack/cmd", json={"session_id": sid, "command": "exploit 5432"}, headers=h)
+        assert r.status_code == 200
+        assert r.json()["stage"] == "privesc"
+
+        p = session.get(f"{API}/hack/{sid}/puzzle", headers=h)
+        assert p.status_code == 200
+        puz = p.json()
+        assert "-- SQL Vulnerable Query Bypass" in puz["code_template"][0]
+        assert puz["options"][0] == "' OR '1'='1"
+
+        bad = session.post(f"{API}/hack/inject", json={"session_id": sid, "answer": "wrong_payload"}, headers=h)
+        assert bad.status_code == 200
+        assert bad.json()["ok"] is False
+
+        good = session.post(f"{API}/hack/cmd", json={"session_id": sid, "command": "inject ' OR '1'='1"}, headers=h)
+        assert good.status_code == 200
+        assert good.json()["code_puzzle_solved"] is True

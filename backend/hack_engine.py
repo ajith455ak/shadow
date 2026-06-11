@@ -10,6 +10,17 @@ from typing import Any, Dict, List, Optional, Tuple
 
 HACK_TARGETS = [
     {
+        "id": "cyber_academy_sandbox",
+        "name": "Cyber Academy Sandbox",
+        "faction": "Cyber Academy",
+        "difficulty": "Easy",
+        "story": "A safe training environment set up by Dr. Cipher. Ideal for learning basic hacking stages.",
+        "ip": "10.0.42.1",
+        "domain": "sandbox.academy",
+        "reward_xp": 150,
+        "reward_coins": 100,
+    },
+    {
         "id": "helix_corp_perimeter",
         "name": "Helix Corp Perimeter",
         "faction": "Helix Corp",
@@ -41,6 +52,28 @@ HACK_TARGETS = [
         "domain": "node-x42.phantom",
         "reward_xp": 600,
         "reward_coins": 400,
+    },
+    {
+        "id": "quantum_core",
+        "name": "Quantum Core Mainframe",
+        "faction": "The Phantom Grid",
+        "difficulty": "Insane",
+        "story": "The core processor hosting the main AI consciousness. Expect heavy security.",
+        "ip": "100.64.0.1",
+        "domain": "core.phantom",
+        "reward_xp": 800,
+        "reward_coins": 500,
+    },
+    {
+        "id": "secure_sql_injector",
+        "name": "Helix SQL Injector Gate",
+        "faction": "Helix Corp",
+        "difficulty": "Hard",
+        "story": "Helix Corp's core SQL gateway. Exploit SQL injection vulnerabilities to dump administrative keys.",
+        "ip": "203.0.113.99",
+        "domain": "sql-injector.helix.corp",
+        "reward_xp": 480,
+        "reward_coins": 300,
     },
 ]
 
@@ -94,7 +127,7 @@ def new_session(user_id: str, character_name: str, target_id: Optional[str] = No
             {"output": f"║  IP: {target['ip']:30}         ║", "kind": "system"},
             {"output": f"╚═══════════════════════════════════════════╝", "kind": "system"},
             {"output": f"[*] Connection established. Stage: RECONNAISSANCE", "kind": "info"},
-            {"output": f"[*] Try: help, nmap {target['ip']}, ping {target['ip']}", "kind": "hint"},
+            {"output": f"[*] Try: tutorial (show guide), help, nmap {target['ip']}", "kind": "hint"},
         ],
         "discovered_ports": [],
         "exploit_success": False,
@@ -151,12 +184,30 @@ CODE_PUZZLES = [
         ],
         "correct_index": 0,
     },
+    {
+        "code_template": [
+            "-- SQL Vulnerable Query Bypass",
+            "SELECT * FROM admin_keys WHERE user = 'admin' AND pass = '____'",
+        ],
+        "answer": "' OR '1'='1",
+        "hint": "Classic SQL bypass tautology, e.g., ' OR '1'='1",
+        "options": [
+            "' OR '1'='1",
+            "admin",
+            "'; DROP TABLE admin_keys; --",
+            "1 UNION SELECT null, secret FROM flags",
+        ],
+        "correct_index": 0,
+    },
 ]
 
 
 def get_code_puzzle(session: Dict[str, Any]) -> Dict[str, Any]:
-    idx = sum(ord(c) for c in session["id"]) % len(CODE_PUZZLES)
-    p = CODE_PUZZLES[idx]
+    if session.get("target", {}).get("id") == "secure_sql_injector":
+        p = CODE_PUZZLES[2]
+    else:
+        idx = sum(ord(c) for c in session["id"]) % 2
+        p = CODE_PUZZLES[idx]
     return {
         "code_template": p["code_template"],
         "options": p["options"],
@@ -165,8 +216,11 @@ def get_code_puzzle(session: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def check_code_answer(session: Dict[str, Any], answer: str) -> bool:
-    idx = sum(ord(c) for c in session["id"]) % len(CODE_PUZZLES)
-    p = CODE_PUZZLES[idx]
+    if session.get("target", {}).get("id") == "secure_sql_injector":
+        p = CODE_PUZZLES[2]
+    else:
+        idx = sum(ord(c) for c in session["id"]) % 2
+        p = CODE_PUZZLES[idx]
     return answer.strip() == p["answer"].strip()
 
 
@@ -202,6 +256,7 @@ def handle_command(session: Dict[str, Any], cmd: str) -> Tuple[List[Dict[str, An
 
     if base == "help":
         add("Available commands:", "info")
+        add("  tutorial            — show step-by-step tutorial guide", "info")
         add("  nmap <ip>           — scan target for open ports", "info")
         add("  ping <ip>           — check host reachability", "info")
         add("  traceroute <ip>     — map route to target", "info")
@@ -214,6 +269,34 @@ def handle_command(session: Dict[str, Any], cmd: str) -> Tuple[List[Dict[str, An
         add("  exfil               — exfiltrate the vault data (final stage)", "info")
         add("  map                 — render the discovered network map", "info")
         add("  clear               — clear screen", "info")
+        return out, patch
+
+    if base == "tutorial":
+        add("═════════════ SHADOW NEXUS HACKING TUTORIAL ═════════════", "success")
+        add("Follow these stages to compromise the target systems:", "info")
+        add("", "info")
+        add("STAGE 1: RECONNAISSANCE (Recon)", "info")
+        add(f"  Run: nmap {target_ip}", "info")
+        add("  This scans the target for open ports and advances to the next stage.", "info")
+        add("", "info")
+        add("STAGE 2: EXPLOITATION (Exploit)", "info")
+        add("  Run: exploit <port_number>  (e.g., exploit 8080)", "info")
+        add("  Choose an open port found in Nmap to establish a foothold reverse shell.", "info")
+        add("", "info")
+        add("STAGE 3: PRIVILEGE ESCALATION (Priv-Esc)", "info")
+        add("  You need to solve two lock gates to gain root access:", "info")
+        add("  1. Code Injection: Run 'inject' to open the code template, then complete", "info")
+        add("     the code with the correct solution in the puzzle panel.", "info")
+        add("  2. Password Cracking: Run 'brute-force' to see the target's MD5 hash.", "info")
+        add("     In the cracker panel, choose or type the plaintext password that matches", "info")
+        add("     the target MD5 hash displayed in the list.", "info")
+        add("", "info")
+        add("STAGE 4: DATA EXFILTRATION (Exfil)", "info")
+        add("  Run: exfil", "info")
+        add("  This extracts the compromised records and finishes the simulation.", "info")
+        add("", "info")
+        add("Finally, exit and click 'Claim Rewards' to receive XP and Coins!", "success")
+        add("════════════════════════════════════════════════════════", "success")
         return out, patch
 
     if base == "clear":
@@ -318,8 +401,23 @@ def handle_command(session: Dict[str, Any], cmd: str) -> Tuple[List[Dict[str, An
     if base == "inject":
         if stage != "privesc":
             add("inject: not available at this stage.", "error"); return out, patch
+        if args:
+            answer = " ".join(args)
+            correct = check_code_answer(session, answer)
+            if correct:
+                add("[+] Injection accepted. Privilege chain extended.", "success")
+                patch["code_puzzle_solved"] = True
+                new_hist = list(session.get("history", [])) + [{"output": "[+] Injection accepted. Privilege chain extended.", "kind": "success"}]
+                if session.get("exploit_success") and session.get("password_cracked"):
+                    patch["stage"] = "exfil"
+                    patch["stage_index"] = 3
+                    new_hist.append({"output": "[+] PRIVILEGE ESCALATION COMPLETE — proceed to EXFIL.", "kind": "success"})
+                patch["history"] = new_hist[-200:]
+            else:
+                add("[-] Injection rejected. Syntax check failed.", "error")
+            return out, patch
         add("[*] Loading code injection puzzle... open the puzzle panel to solve.", "info")
-        add("[*] Submit answer via the in-game puzzle UI.", "hint")
+        add("[*] Submit answer via the in-game puzzle UI or run: inject <code_snippet>", "hint")
         patch["puzzle_open"] = True
         return out, patch
 

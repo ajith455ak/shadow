@@ -69,6 +69,15 @@ class ForgotIn(BaseModel):
     email: EmailStr
 
 
+class VerifyEmailIn(BaseModel):
+    email: EmailStr
+    token: str
+
+
+class HackCompleteIn(BaseModel):
+    session_id: str
+
+
 class CharacterCreateIn(BaseModel):
     name: str = Field(min_length=2, max_length=24)
     avatar_id: str
@@ -209,7 +218,10 @@ def _serialize_character(c: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def daily_seed_index(user_id: str, date_str: str, slot: int) -> int:
-    h = abs(hash(f"{user_id}-{date_str}-{slot}")) % len(DAILY_TEMPLATES)
+    import hashlib
+    key = f"{user_id}-{date_str}-{slot}".encode("utf-8")
+    h_hex = hashlib.sha256(key).hexdigest()
+    h = int(h_hex, 16) % len(DAILY_TEMPLATES)
     return h
 
 
@@ -285,11 +297,16 @@ async def register(payload: RegisterIn):
     uname_taken = await db.users.find_one({"username": payload.username})
     if uname_taken:
         raise HTTPException(status_code=400, detail="Username already taken")
+    v_token = str(uuid.uuid4())
+    v_expires = (utcnow() + timedelta(hours=24)).isoformat()
     user = {
         "id": str(uuid.uuid4()),
         "username": payload.username,
         "email": payload.email.lower(),
         "password_hash": hash_password(payload.password),
+        "email_verified": False,
+        "verification_token": v_token,
+        "verification_token_expires_at": v_expires,
         "created_at": utcnow().isoformat(),
     }
     await db.users.insert_one(user)
@@ -298,6 +315,7 @@ async def register(payload: RegisterIn):
         "token": token,
         "user": {"id": user["id"], "username": user["username"], "email": user["email"]},
         "has_character": False,
+        "verification_token_demo": v_token,
     }
 
 
@@ -306,12 +324,61 @@ async def login(payload: LoginIn):
     user = await db.users.find_one({"email": payload.email.lower()})
     if not user or not verify_password(payload.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not user.get("email_verified", False):
+        raise HTTPException(status_code=400, detail="Email not verified. Please verify your email before logging in.")
     token = create_token(user["id"], remember=payload.remember_me)
     char = await db.characters.find_one({"user_id": user["id"]}, {"_id": 0})
     return {
         "token": token,
         "user": {"id": user["id"], "username": user["username"], "email": user["email"]},
         "has_character": bool(char),
+    }
+
+
+@api.post("/auth/verify-email")
+async def verify_email(payload: VerifyEmailIn):
+    user = await db.users.find_one({"email": payload.email.lower()})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.get("email_verified", False):
+        return {"message": "Email already verified"}
+    token = user.get("verification_token")
+    expires_str = user.get("verification_token_expires_at")
+    if not token or token != payload.token:
+        raise HTTPException(status_code=400, detail="Invalid verification token")
+    if expires_str and datetime.fromisoformat(expires_str) < utcnow():
+        raise HTTPException(status_code=400, detail="Verification token has expired")
+    await db.users.update_one(
+        {"id": user["id"]},
+        {
+            "$set": {"email_verified": True},
+            "$unset": {"verification_token": "", "verification_token_expires_at": ""},
+        }
+    )
+    return {"message": "Email verified successfully"}
+
+
+@api.post("/auth/resend-verification")
+async def resend_verification(payload: ForgotIn):
+    user = await db.users.find_one({"email": payload.email.lower()})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.get("email_verified", False):
+        return {"message": "Email already verified"}
+    v_token = str(uuid.uuid4())
+    v_expires = (utcnow() + timedelta(hours=24)).isoformat()
+    await db.users.update_one(
+        {"id": user["id"]},
+        {
+            "$set": {
+                "verification_token": v_token,
+                "verification_token_expires_at": v_expires,
+            }
+        }
+    )
+    return {
+        "message": "Verification email resent.",
+        "verification_token_demo": v_token,
     }
 
 
@@ -954,9 +1021,9 @@ async def hack_inject(payload: HackInjectIn, user=Depends(get_current_user)):
 
 
 @api.post("/hack/complete")
-async def hack_complete(payload: HackStartIn, user=Depends(get_current_user)):
-    """Claim rewards once exfil_complete is true. payload.target = session_id."""
-    sess = await db.hack_sessions.find_one({"id": payload.target, "user_id": user["id"]}, {"_id": 0})
+async def hack_complete(payload: HackCompleteIn, user=Depends(get_current_user)):
+    """Claim rewards once exfil_complete is true."""
+    sess = await db.hack_sessions.find_one({"id": payload.session_id, "user_id": user["id"]}, {"_id": 0})
     if not sess:
         raise HTTPException(status_code=404, detail="Hack session not found")
     if not sess.get("exfil_complete"):
@@ -1133,9 +1200,10 @@ async def npcs_trust(user=Depends(get_current_user)):
 
 # Include router & middleware
 app.include_router(api)
+CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:8081,http://localhost:19006,http://127.0.0.1:8081").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

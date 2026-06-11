@@ -101,3 +101,145 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Build, configure, and verify the Shadow Nexus application (backend, frontend, database, and integration tests)"
+backend:
+  - task: "Configure backend environment files"
+    implemented: true
+    working: true
+    file: "backend/.env"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Copied template .env.example to .env and set local development keys."
+  - task: "Install and run MongoDB Server"
+    implemented: true
+    working: true
+    file: "N/A"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Installed MongoDB Server via winget and confirmed service running on port 27017."
+  - task: "Setup Python virtual environment and dependencies"
+    implemented: true
+    working: true
+    file: "backend/requirements.txt"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Created .venv, installed requirements.txt, and resolved emergentintegrations using local mock package."
+  - task: "Verify backend integration test suite"
+    implemented: true
+    working: true
+    file: "backend/tests/"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Successfully ran pytest with BACKEND_URL and EXPO_PUBLIC_BACKEND_URL overrides. All 59 tests passed (1 skipped)."
+  - task: "Implement and verify email verification system"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Added fields to user schema, register/login verification checks, and endpoints /verify-email and /resend-verification. Verified with new pytest integration test lifecycle (60/60 passed)."
+  - task: "Address minor backend improvements and code reviews"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Replaced hash() with sha256 in daily_seed_index. Used HackCompleteIn model in /hack/complete. Restricted CORS allowed origins list to prevent wildcard credential sharing."
+  - task: "Extend hack mode targets"
+    implemented: true
+    working: true
+    file: "backend/hack_engine.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Added secure_sql_injector (Helix SQL Injector Gate) alongside Cyber Academy Sandbox and Quantum Core Mainframe targets to HACK_TARGETS. Configured a custom SQL injection puzzle template (' OR '1'='1) served exclusively for this target. Updated test suite to expect 6 targets (62/62 passed)."
+  - task: "Implement interactive tutorial terminal command"
+    implemented: true
+    working: true
+    file: "backend/hack_engine.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Added 'tutorial' command showing a step-by-step stage guide. Updated terminal hints and help outputs. Extended 'inject' command to accept inline payload arguments (e.g., 'inject <payload>') and verified both correct and incorrect payload injection in the integration test suite."
+frontend:
+  - task: "Configure frontend environment files"
+    implemented: true
+    working: true
+    file: "frontend/.env"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Copied .env.example to .env targeting http://localhost:8001."
+  - task: "Install node modules using Yarn"
+    implemented: true
+    working: true
+    file: "frontend/package.json"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Installed all packages successfully using Yarn on Windows after prepending node to check-pkg.js script."
+  - task: "Verify Expo web bundler compilation"
+    implemented: true
+    working: true
+    file: "frontend/package.json"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Started Expo bundler for web and confirmed successful bundling and server startup on http://localhost:8081."
+metadata:
+  created_by: "main_agent"
+  version: "1.5"
+  test_sequence: 6
+  run_ui: false
+test_plan:
+  current_focus:
+    - "Verify backend integration test suite"
+    - "Verify Expo web bundler compilation"
+    - "Extend hack mode targets"
+    - "Implement interactive tutorial terminal command"
+  stuck_tasks: []
+  test_all: true
+  test_priority: "sequential"
+agent_communication:
+  - agent: "main"
+    message: "Verified and enabled full Android & iOS platform support. Configured client.ts to dynamically swap localhost/127.0.0.1 with 10.0.2.2 on Android emulators. Restarted the backend uvicorn server binding to 0.0.0.0:8001 so that external mobile devices/emulators can reach the endpoints. All 62 test cases pass successfully."

@@ -2,9 +2,13 @@
  * API client for Shadow Nexus.
  * All requests prefixed with /api. Auth token from secure storage.
  */
+import { Platform } from "react-native";
 import { storage } from "@/src/utils/storage";
 
-const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "";
+let BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "";
+if (Platform.OS === "android" && (BASE.includes("localhost") || BASE.includes("127.0.0.1"))) {
+  BASE = BASE.replace("localhost", "10.0.2.2").replace("127.0.0.1", "10.0.2.2");
+}
 
 const TOKEN_KEY = "sn_token";
 

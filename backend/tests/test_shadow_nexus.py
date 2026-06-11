@@ -29,6 +29,13 @@ def fresh_user(session):
     r = session.post(f"{BASE_URL}/api/auth/register", json=payload)
     assert r.status_code == 200, r.text
     data = r.json()
+    token = data.get("verification_token_demo")
+    if token:
+        v_res = session.post(f"{BASE_URL}/api/auth/verify-email", json={
+            "email": payload["email"],
+            "token": token
+        })
+        assert v_res.status_code == 200, v_res.text
     return {**payload, **data}
 
 
@@ -124,6 +131,74 @@ class TestAuth:
         body = r.json()
         # Security: same message returned, but reset_token_demo is None
         assert body.get("reset_token_demo") in (None, "")
+
+    def test_email_verification_lifecycle(self, session):
+        # 1. Register a fresh user
+        suffix = uuid.uuid4().hex[:8]
+        email = f"verify_test_{suffix}@nexus.io"
+        payload = {
+            "username": f"VTEST_{suffix}",
+            "email": email,
+            "password": "password123",
+        }
+        r = session.post(f"{BASE_URL}/api/auth/register", json=payload)
+        assert r.status_code == 200
+        data = r.json()
+        token = data.get("verification_token_demo")
+        assert token
+
+        # 2. Login should fail because email is not verified
+        login_res = session.post(f"{BASE_URL}/api/auth/login", json={
+            "email": email,
+            "password": "password123"
+        })
+        assert login_res.status_code == 400
+        assert "not verified" in login_res.json()["detail"].lower()
+
+        # 3. Resend verification token should return a new token
+        resend_res = session.post(f"{BASE_URL}/api/auth/resend-verification", json={
+            "email": email
+        })
+        assert resend_res.status_code == 200
+        new_token = resend_res.json().get("verification_token_demo")
+        assert new_token
+        assert new_token != token
+
+        # 4. Verify with invalid token should fail
+        v_fail = session.post(f"{BASE_URL}/api/auth/verify-email", json={
+            "email": email,
+            "token": "invalid-token"
+        })
+        assert v_fail.status_code == 400
+
+        # 5. Verify with correct new token should succeed
+        v_ok = session.post(f"{BASE_URL}/api/auth/verify-email", json={
+            "email": email,
+            "token": new_token
+        })
+        assert v_ok.status_code == 200
+
+        # 6. Verify again should return already verified message
+        v_again = session.post(f"{BASE_URL}/api/auth/verify-email", json={
+            "email": email,
+            "token": new_token
+        })
+        assert v_again.status_code == 200
+        assert "already verified" in v_again.json()["message"].lower()
+
+        # 7. Resend verification for verified user should fail/return already verified
+        resend_again = session.post(f"{BASE_URL}/api/auth/resend-verification", json={
+            "email": email
+        })
+        assert resend_again.status_code == 200
+        assert "already verified" in resend_again.json()["message"].lower()
+
+        # 8. Login should now succeed
+        login_ok = session.post(f"{BASE_URL}/api/auth/login", json={
+            "email": email,
+            "password": "password123"
+        })
+        assert login_ok.status_code == 200
 
     def test_me_requires_auth(self, session):
         r = session.get(f"{BASE_URL}/api/auth/me")
@@ -284,7 +359,7 @@ class TestNPCs:
         r = session.get(f"{BASE_URL}/api/npcs")
         assert r.status_code == 200
         npcs = r.json()
-        assert len(npcs) == 5
+        assert len(npcs) == 8
         for n in npcs:
             assert "system_prompt" not in n
 
