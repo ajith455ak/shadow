@@ -11,7 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import StaleElementReferenceException, ElementNotInteractableException
 
 CHROME_PATH = r"C:\Users\ajith kumar\AppData\Local\ms-playwright\chromium-1223\chrome-win64\chrome.exe"
-FRONTEND_URL = "http://localhost:8081"
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:8081")
 
 # Generate a unique operative for testing
 RAND_ID = random.randint(100000, 999999)
