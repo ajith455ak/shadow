@@ -60,6 +60,31 @@ SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", "")
 
 def send_email(to_email: str, subject: str, html_body: str):
+    resend_key = os.environ.get("RESEND_API_KEY", "")
+    if resend_key:
+        try:
+            import requests
+            from_email = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+            url = "https://api.resend.com/emails"
+            headers = {
+                "Authorization": f"Bearer {resend_key}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "from": f"Shadow Nexus <{from_email}>",
+                "to": [to_email],
+                "subject": subject,
+                "html": html_body
+            }
+            response = requests.post(url, json=payload, headers=headers)
+            if response.status_code in (200, 201):
+                log.info(f"Email sent successfully to {to_email} via Resend")
+                return
+            else:
+                log.error(f"Resend API returned status {response.status_code}: {response.text}")
+        except Exception as e:
+            log.error(f"Failed to send email via Resend to {to_email}: {e}")
+
     if not SMTP_HOST or not SMTP_USERNAME or not SMTP_PASSWORD:
         log.info(f"[Mock Email] to={to_email} subject='{subject}'")
         return
@@ -74,9 +99,9 @@ def send_email(to_email: str, subject: str, html_body: str):
             server.starttls()
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
             server.send_message(msg)
-        log.info(f"Email sent successfully to {to_email}")
+        log.info(f"Email sent successfully to {to_email} via SMTP")
     except Exception as e:
-        log.error(f"Failed to send email to {to_email}: {e}")
+        log.error(f"Failed to send email to {to_email} via SMTP: {e}")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("shadow_nexus")

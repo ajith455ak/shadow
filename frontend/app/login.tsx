@@ -93,7 +93,20 @@ export default function LoginScreen() {
               </Link>
             </View>
 
-            {err ? <MonoText style={{ color: COLORS.red, marginBottom: 12, fontSize: 12 }}>{err}</MonoText> : null}
+            {err ? (
+              <View style={{ marginBottom: 12 }}>
+                <MonoText style={{ color: COLORS.red, fontSize: 12 }}>{err}</MonoText>
+                {err.includes("verify your email") ? (
+                  <Link href={{ pathname: "/verify-email", params: { email: email.trim() } }} asChild>
+                    <Pressable testID="go-to-verify-email" style={{ marginTop: 6 }}>
+                      <MonoText style={{ color: COLORS.cyan, fontSize: 12, textDecorationLine: "underline" }}>
+                        Go to verification page &rarr;
+                      </MonoText>
+                    </Pressable>
+                  </Link>
+                ) : null}
+              </View>
+            ) : null}
 
             <NeonButton
               testID="login-submit-button"

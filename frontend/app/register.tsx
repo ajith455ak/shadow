@@ -52,7 +52,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register(username.trim(), email.trim(), password);
-      router.replace("/character-creation");
+      router.replace({ pathname: "/verify-email", params: { email: email.trim() } });
     } catch (e: any) {
       setErr(e?.message || "Registration failed");
     } finally {
