@@ -44,7 +44,7 @@ export default function Messenger() {
       <Pressable onPress={() => router.back()}>
         <MonoText style={{ color: COLORS.cyan, marginBottom: 8 }}>← Back</MonoText>
       </Pressable>
-      <NeonLabel color={COLORS.green}>// secure_messenger.enc</NeonLabel>
+      <NeonLabel color={COLORS.green}>{"// secure_messenger.enc"}</NeonLabel>
       <TitleText style={styles.title}>MESSAGES</TitleText>
       <MutedText style={{ marginVertical: 8 }}>
         Encrypted comms from your network. {data.messages.length === 0 ? "Inbox empty." : `${data.messages.length} transmissions logged.`}

@@ -22,7 +22,7 @@ export default function Inventory() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <NeonLabel color={COLORS.cyan}>// arsenal.dat</NeonLabel>
+      <NeonLabel color={COLORS.cyan}>{"// arsenal.dat"}</NeonLabel>
       <TitleText style={styles.title}>GEAR</TitleText>
       <MutedText style={{ marginBottom: 14 }}>Your tools, equipment, and consumables.</MutedText>
 
@@ -49,7 +49,7 @@ export default function Inventory() {
         </View>
       </View>
 
-      <NeonLabel color={COLORS.cyan} style={{ marginTop: 18 }}>// inventory</NeonLabel>
+      <NeonLabel color={COLORS.cyan} style={{ marginTop: 18 }}>{"// inventory"}</NeonLabel>
       <View style={styles.grid}>
         {data.items.length === 0 ? (
           <MutedText style={{ padding: 18 }}>Inventory empty. Complete missions to acquire gear.</MutedText>

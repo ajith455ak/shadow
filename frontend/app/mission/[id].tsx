@@ -142,7 +142,7 @@ export default function MissionScreen() {
       <Pressable testID="mission-back" onPress={() => router.back()} style={{ marginBottom: 14 }}>
         <MonoText style={{ color: COLORS.cyan }}>← Back</MonoText>
       </Pressable>
-      <NeonLabel color={COLORS.cyan}>// mission_brief.dat</NeonLabel>
+      <NeonLabel color={COLORS.cyan}>{"// mission_brief.dat"}</NeonLabel>
       <TitleText style={styles.title}>{mission.title}</TitleText>
       <View style={styles.metaRow}>
         <MonoText style={{ color: COLORS.amber, fontSize: 11 }}>★ {mission.difficulty}</MonoText>

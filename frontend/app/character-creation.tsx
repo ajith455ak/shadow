@@ -70,7 +70,7 @@ export default function CharacterCreation() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <NeonLabel color={COLORS.cyan}>// genesis_protocol_v1.0</NeonLabel>
+      <NeonLabel color={COLORS.cyan}>{"// genesis_protocol_v1.0"}</NeonLabel>
       <TitleText style={styles.title}>BUILD YOUR{"\n"}OPERATIVE</TitleText>
 
       <CyberInput
@@ -82,7 +82,7 @@ export default function CharacterCreation() {
         maxLength={24}
       />
 
-      <NeonLabel color={COLORS.purple} style={{ marginTop: 4 }}>// select avatar</NeonLabel>
+      <NeonLabel color={COLORS.purple} style={{ marginTop: 4 }}>{"// select avatar"}</NeonLabel>
       <View style={styles.avatarPreview}>
         <View style={[styles.avatarBig, { borderColor: selectedAvatar.color, shadowColor: selectedAvatar.color }]}>
           <Ionicons name={selectedAvatar.icon as any} size={72} color={selectedAvatar.color} />
@@ -114,7 +114,7 @@ export default function CharacterCreation() {
         )}
       />
 
-      <NeonLabel color={COLORS.green} style={{ marginTop: 24 }}>// select cyber class</NeonLabel>
+      <NeonLabel color={COLORS.green} style={{ marginTop: 24 }}>{"// select cyber class"}</NeonLabel>
       <View style={styles.classGrid}>
         {classes.map((c, i) => (
           <Pressable

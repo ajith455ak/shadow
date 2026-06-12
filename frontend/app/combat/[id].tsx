@@ -92,7 +92,7 @@ export default function CombatScreen() {
     if (newHp > 0) setTurn("player");
   };
 
-  const useMove = (moveId: string) => {
+  const handleUseMove = (moveId: string) => {
     if (!combat || turn !== "player") return;
     const m = combat.moves.find(x => x.id === moveId)!;
     let newPHp = playerHp;
@@ -153,7 +153,7 @@ export default function CombatScreen() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <NeonLabel color={COLORS.red}>// combat_engaged</NeonLabel>
+      <NeonLabel color={COLORS.red}>{"// combat_engaged"}</NeonLabel>
       <TitleText style={styles.title}>CYBER COMBAT</TitleText>
 
       {/* Enemy */}
@@ -200,14 +200,14 @@ export default function CombatScreen() {
       </View>
 
       {/* Moves */}
-      <NeonLabel color={COLORS.cyan} style={{ marginTop: 18 }}>// actions {turn === "enemy" ? "(enemy turn...)" : ""}</NeonLabel>
+      <NeonLabel color={COLORS.cyan} style={{ marginTop: 18 }}>{"// actions "}{turn === "enemy" ? "(enemy turn...)" : ""}</NeonLabel>
       <View style={styles.moveGrid}>
         {combat.moves.map(m => (
           <Pressable
             key={m.id}
             testID={`move-${m.id}`}
             disabled={turn !== "player"}
-            onPress={() => useMove(m.id)}
+            onPress={() => handleUseMove(m.id)}
             style={[styles.moveBtn, { borderColor: m.color, shadowColor: m.color, opacity: turn === "player" ? 1 : 0.5 }]}
           >
             <Ionicons name={m.icon as any} size={22} color={m.color} />

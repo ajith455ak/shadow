@@ -59,7 +59,7 @@ export default function VerifyEmailScreen() {
     <View style={styles.root}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <NeonLabel color={COLORS.purple}>// verify_identity.init</NeonLabel>
+          <NeonLabel color={COLORS.purple}>{"// verify_identity.init"}</NeonLabel>
           <TitleText style={styles.title}>VERIFICATION{"\n"}REQUIRED</TitleText>
           <MutedText style={{ marginVertical: 12 }}>
             Complete the security verification process to gain grid access.

@@ -19,7 +19,7 @@ export default function Achievements() {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
       <Pressable onPress={() => router.back()}><MonoText style={{ color: COLORS.cyan, marginBottom: 8 }}>← Back</MonoText></Pressable>
-      <NeonLabel color={COLORS.amber}>// achievements.log</NeonLabel>
+      <NeonLabel color={COLORS.amber}>{"// achievements.log"}</NeonLabel>
       <TitleText style={styles.title}>HALL OF{"\n"}LEGENDS</TitleText>
       <MutedText style={{ marginBottom: 16, marginTop: 6 }}>
         {unlocked} / {achs.length} achievements forged.

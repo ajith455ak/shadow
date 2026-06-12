@@ -35,7 +35,7 @@ export default function NPCList() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <NeonLabel color={COLORS.green}>// contacts.encrypted</NeonLabel>
+      <NeonLabel color={COLORS.green}>{"// contacts.encrypted"}</NeonLabel>
       <TitleText style={styles.title}>NETWORK</TitleText>
       <MutedText style={{ marginBottom: 18 }}>Operatives, mentors, rivals, ghosts.</MutedText>
 

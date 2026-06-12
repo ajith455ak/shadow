@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 /**
  * Shadow Nexus — design tokens.
  * Cyberpunk dark base + neon accents.
@@ -36,8 +38,6 @@ export const SHADOW_NEON = (color: string) => ({
   shadowOffset: { width: 0, height: 0 },
   elevation: 6,
 });
-
-import { Platform } from "react-native";
 
 const MONO = Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" });
 

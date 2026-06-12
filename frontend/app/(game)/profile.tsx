@@ -26,7 +26,7 @@ export default function Profile() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <NeonLabel color={COLORS.cyan}>// profile.sys</NeonLabel>
+      <NeonLabel color={COLORS.cyan}>{"// profile.sys"}</NeonLabel>
       <TitleText style={styles.title}>OPERATIVE</TitleText>
 
       <View style={[styles.heroCard, { borderColor: av.color, shadowColor: av.color }]}>
@@ -45,7 +45,7 @@ export default function Profile() {
         </View>
       </View>
 
-      <NeonLabel color={COLORS.cyan} style={{ marginTop: 20 }}>// stats</NeonLabel>
+      <NeonLabel color={COLORS.cyan} style={{ marginTop: 20 }}>{"// stats"}</NeonLabel>
       <View style={styles.statsBox}>
         {Object.entries(char.stats).map(([k, v]) => (
           <View key={k} style={styles.statRow}>

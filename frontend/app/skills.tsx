@@ -33,7 +33,7 @@ export default function SkillsScreen() {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
       <Pressable onPress={() => router.back()}><MonoText style={{ color: COLORS.cyan, marginBottom: 8 }}>← Back</MonoText></Pressable>
-      <NeonLabel color={COLORS.green}>// skill_matrix.dat</NeonLabel>
+      <NeonLabel color={COLORS.green}>{"// skill_matrix.dat"}</NeonLabel>
       <TitleText style={styles.title}>SKILL TREE</TitleText>
       <View style={styles.pointsBox}>
         <Ionicons name="diamond" size={18} color={COLORS.green} />

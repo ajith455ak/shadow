@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator, Animated, FlatList, KeyboardAvoidingView, Modal, Platform,
+  ActivityIndicator, FlatList, KeyboardAvoidingView, Modal, Platform,
   Pressable, ScrollView, StyleSheet, TextInput, View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -79,7 +79,7 @@ export default function HackTerminal() {
         }
       } catch { /* noop */ }
     })();
-  }, [id]);
+  }, [id, router]);
 
   useEffect(() => {
     if (session?.puzzle_open) setShowPuzzle(true);
@@ -192,7 +192,7 @@ export default function HackTerminal() {
           <Ionicons name="alert-circle" size={56} color={COLORS.red} />
           <TitleText style={{ color: COLORS.red, fontSize: 24, marginTop: 12, textAlign: "center" }}>CONNECTION TRACED</TitleText>
           <MonoText style={{ color: COLORS.textPrimary, marginTop: 14, fontSize: 12, textAlign: "center", lineHeight: 18 }}>
-            Your connection signature was fully resolved by the remote administrator's intrusion detection system. The tunnel was closed and your session was wiped.
+            {"Your connection signature was fully resolved by the remote administrator's intrusion detection system. The tunnel was closed and your session was wiped."}
           </MonoText>
         </View>
         <NeonButton testID="hack-done-return" label="Return to HQ" color={COLORS.red} variant="solid" onPress={() => router.replace("/dashboard")} />

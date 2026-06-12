@@ -18,7 +18,7 @@ export default function Leaderboard() {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
       <Pressable onPress={() => router.back()}><MonoText style={{ color: COLORS.cyan, marginBottom: 8 }}>← Back</MonoText></Pressable>
-      <NeonLabel color={COLORS.purple}>// global_rankings</NeonLabel>
+      <NeonLabel color={COLORS.purple}>{"// global_rankings"}</NeonLabel>
       <TitleText style={styles.title}>LEADERBOARD</TitleText>
       <MutedText style={{ marginBottom: 16, marginTop: 6 }}>The elite of the Shadow Nexus.</MutedText>
 

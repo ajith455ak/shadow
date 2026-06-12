@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Link, useRouter } from "expo-router";
+import { Link } from "expo-router";
 import { COLORS, FONT } from "@/src/theme";
 import { api } from "@/src/api/client";
 import { CyberInput } from "@/src/components/CyberInput";
@@ -8,7 +8,6 @@ import { NeonButton } from "@/src/components/NeonButton";
 import { MonoText, NeonLabel, TitleText, MutedText } from "@/src/components/Typography";
 
 export default function ForgotPassword() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -32,7 +31,7 @@ export default function ForgotPassword() {
   return (
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <NeonLabel color={COLORS.amber}>// recovery_protocol</NeonLabel>
+        <NeonLabel color={COLORS.amber}>{"// recovery_protocol"}</NeonLabel>
         <TitleText style={styles.title}>FORGOT{"\n"}ACCESS?</TitleText>
         <MutedText style={{ marginVertical: 12 }}>
           Enter your email. A reset link will be transmitted via secure channel.

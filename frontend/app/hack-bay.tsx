@@ -36,7 +36,7 @@ export default function HackLauncher() {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
       <Pressable onPress={() => router.back()}><MonoText style={{ color: COLORS.cyan, marginBottom: 8 }}>← Back</MonoText></Pressable>
-      <NeonLabel color={COLORS.green}>// jack_in.exe</NeonLabel>
+      <NeonLabel color={COLORS.green}>{"// jack_in.exe"}</NeonLabel>
       <TitleText style={styles.title}>HACK BAY</TitleText>
       <MutedText style={{ marginBottom: 16, marginTop: 6 }}>
         Select a target. 4-stage breach: Recon → Exploit → Priv-Esc → Exfil. Terminal commands are live.

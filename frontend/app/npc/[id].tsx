@@ -8,7 +8,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { COLORS, FONT } from "@/src/theme";
 import { api } from "@/src/api/client";
 import { MonoText, MutedText, NeonLabel } from "@/src/components/Typography";
-import { NeonButton } from "@/src/components/NeonButton";
 
 type Msg = { role: "user" | "assistant"; content: string; ts?: string };
 
@@ -181,7 +180,7 @@ export default function NPCDialogue() {
               <Pressable onPress={() => setShowPersuade(false)}><Ionicons name="close" size={22} color={COLORS.textSecondary} /></Pressable>
             </View>
             <MutedText style={{ marginVertical: 10, fontSize: 12 }}>
-              Pick an approach. Outcomes depend on {npc.name}'s personality, current trust, and your Social Engineering stat.
+              {"Pick an approach. Outcomes depend on "}{npc.name}{"'s personality, current trust, and your Social Engineering stat."}
             </MutedText>
             <View style={styles.approachGrid}>
               {APPROACHES.map((a) => (
@@ -204,7 +203,7 @@ export default function NPCDialogue() {
                   TRUST {persuadeResult.delta >= 0 ? "+" : ""}{persuadeResult.delta} → {persuadeResult.trust}
                 </MonoText>
                 <MonoText style={{ color: COLORS.textPrimary, fontSize: 12, marginTop: 8, lineHeight: 18, fontStyle: "italic" }}>
-                  "{persuadeResult.reaction}"
+                  &ldquo;{persuadeResult.reaction}&rdquo;
                 </MonoText>
               </View>
             ) : null}

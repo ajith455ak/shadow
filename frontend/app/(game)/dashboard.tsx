@@ -46,7 +46,7 @@ export default function Dashboard() {
 
       <View style={styles.header}>
         <View>
-          <NeonLabel color={COLORS.cyan}>// nexus_hq.online</NeonLabel>
+          <NeonLabel color={COLORS.cyan}>{"// nexus_hq.online"}</NeonLabel>
           <TitleText style={styles.title}>{c.name.toUpperCase()}</TitleText>
           <MonoText style={{ color: cl.color, fontSize: 11, marginTop: 2 }}>
             {cl.name.toUpperCase()} · REP {c.reputation}

@@ -43,7 +43,7 @@ export default function LoginScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.brandBlock}>
-            <NeonLabel color={COLORS.cyan}>// shadow_nexus.exe</NeonLabel>
+            <NeonLabel color={COLORS.cyan}>{"// shadow_nexus.exe"}</NeonLabel>
             <TitleText style={styles.title}>SHADOW{"\n"}NEXUS</TitleText>
             <MutedText style={{ marginTop: 4 }}>
               The Phantom Grid is awakening. Jack in, Agent.

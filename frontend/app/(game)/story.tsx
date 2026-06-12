@@ -45,7 +45,7 @@ export default function StoryScreen() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <NeonLabel color={COLORS.purple}>// story_archive.dat</NeonLabel>
+      <NeonLabel color={COLORS.purple}>{"// story_archive.dat"}</NeonLabel>
       <TitleText style={styles.title}>STORY ARCHIVE</TitleText>
       <MutedText style={{ marginBottom: 16 }}>Five chapters. One Phantom Grid. Begin where it bleeds.</MutedText>
 
@@ -98,7 +98,7 @@ export default function StoryScreen() {
       ) : null}
 
       <View style={{ marginTop: 18 }}>
-        <NeonLabel color={COLORS.cyan}>// mission_chain</NeonLabel>
+        <NeonLabel color={COLORS.cyan}>{"// mission_chain"}</NeonLabel>
         {missions.map((m, idx) => (
           <Pressable
             key={m.id}

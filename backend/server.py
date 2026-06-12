@@ -37,6 +37,7 @@ MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ["DB_NAME"]
 JWT_SECRET = os.environ["JWT_SECRET"]
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
+ENABLE_DEMO_TOKENS = os.environ.get("ENABLE_DEMO_TOKENS", "false").lower() == "true"
 
 JWT_ALG = "HS256"
 JWT_EXPIRY_HOURS = 24
@@ -200,13 +201,15 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def hash_password(pw: str) -> str:
-    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
+import asyncio
+
+async def hash_password(pw: str) -> str:
+    return await asyncio.to_thread(lambda: bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode())
 
 
-def verify_password(pw: str, hashed: str) -> bool:
+async def verify_password(pw: str, hashed: str) -> bool:
     try:
-        return bcrypt.checkpw(pw.encode(), hashed.encode())
+        return await asyncio.to_thread(bcrypt.checkpw, pw.encode(), hashed.encode())
     except Exception:
         return False
 
@@ -220,7 +223,10 @@ def create_token(user_id: str, remember: bool = False) -> str:
 def decode_token(tok: str) -> str:
     try:
         payload = jwt.decode(tok, JWT_SECRET, algorithms=[JWT_ALG])
-        return payload["sub"]
+        sub = payload.get("sub")
+        if not sub:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+        return sub
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
@@ -229,7 +235,10 @@ async def get_current_user(creds: Optional[HTTPAuthorizationCredentials] = Depen
     if not creds:
         raise HTTPException(status_code=401, detail="Missing authentication")
     user_id = decode_token(creds.credentials)
-    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    user = await db.users.find_one(
+        {"id": user_id},
+        {"_id": 0, "password_hash": 0, "verification_token": 0, "verification_token_expires_at": 0, "verification_attempts": 0}
+    )
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return user
@@ -351,13 +360,55 @@ def apply_xp(char: Dict[str, Any], xp_gain: int) -> Dict[str, Any]:
     return {"leveled_up": leveled, "new_level": char["level"]}
 
 
+# ---------- RATE LIMITER ----------
+from collections import defaultdict
+import time
+import threading
+from fastapi import Request
+
+class RateLimiter:
+    def __init__(self, requests_limit: int, window_seconds: int):
+        self.limit = requests_limit
+        self.window = window_seconds
+        self.history = defaultdict(list)
+        self.lock = threading.Lock()
+        
+    def is_allowed(self, key: str) -> bool:
+        with self.lock:
+            now = time.monotonic()
+            cutoff = now - self.window
+            self.history[key] = [t for t in self.history[key] if t > cutoff]
+            if len(self.history[key]) >= self.limit:
+                return False
+            self.history[key].append(now)
+            return True
+
+auth_limiter = RateLimiter(requests_limit=10, window_seconds=60)
+
+def get_client_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip.strip()
+    return request.client.host if request.client else "unknown"
+
+async def limit_auth_requests(request: Request):
+    client_ip = get_client_ip(request)
+    if not auth_limiter.is_allowed(client_ip):
+        raise HTTPException(
+            status_code=429, 
+            detail="Too many authentication attempts. Please try again after a minute."
+        )
+
 # ---------- ROUTES ----------
 @api.get("/")
 async def root():
     return {"app": "Shadow Nexus", "status": "online", "version": "1.0.0"}
 
 
-@api.post("/auth/register")
+@api.post("/auth/register", dependencies=[Depends(limit_auth_requests)])
 async def register(payload: RegisterIn, background_tasks: BackgroundTasks):
     existing = await db.users.find_one({"email": payload.email.lower()})
     if existing:
@@ -367,14 +418,16 @@ async def register(payload: RegisterIn, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=400, detail="Username already taken")
     v_token = f"{random.randint(100000, 999999)}"
     v_expires = (utcnow() + timedelta(hours=24)).isoformat()
+    pw_hash = await hash_password(payload.password)
     user = {
         "id": str(uuid.uuid4()),
         "username": payload.username,
         "email": payload.email.lower(),
-        "password_hash": hash_password(payload.password),
+        "password_hash": pw_hash,
         "email_verified": False,
         "verification_token": v_token,
         "verification_token_expires_at": v_expires,
+        "verification_attempts": 0,
         "created_at": utcnow().isoformat(),
     }
     await db.users.insert_one(user)
@@ -394,18 +447,21 @@ async def register(payload: RegisterIn, background_tasks: BackgroundTasks):
     """
     background_tasks.add_task(send_email, payload.email.lower(), "Shadow Nexus - Verify Email Code", html)
     
-    return {
+    ret = {
         "token": token,
         "user": {"id": user["id"], "username": user["username"], "email": user["email"]},
         "has_character": False,
-        "verification_token_demo": v_token,
     }
+    if ENABLE_DEMO_TOKENS:
+        ret["verification_token_demo"] = v_token
+    return ret
 
 
-@api.post("/auth/login")
+@api.post("/auth/login", dependencies=[Depends(limit_auth_requests)])
 async def login(payload: LoginIn):
     user = await db.users.find_one({"email": payload.email.lower()})
-    if not user or not verify_password(payload.password, user["password_hash"]):
+    pw_verified = await verify_password(payload.password, user["password_hash"]) if user else False
+    if not user or not pw_verified:
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.get("email_verified", False):
         raise HTTPException(status_code=400, detail="Email not verified. Please verify your email before logging in.")
@@ -418,16 +474,33 @@ async def login(payload: LoginIn):
     }
 
 
-@api.post("/auth/verify-email")
+@api.post("/auth/verify-email", dependencies=[Depends(limit_auth_requests)])
 async def verify_email(payload: VerifyEmailIn):
     user = await db.users.find_one({"email": payload.email.lower()})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if user.get("email_verified", False):
         return {"message": "Email already verified"}
+    
+    # Brute-force OTP protection check
+    attempts = user.get("verification_attempts", 0)
+    if attempts >= 5:
+        await db.users.update_one(
+            {"id": user["id"]},
+            {
+                "$set": {"verification_attempts": 0},
+                "$unset": {"verification_token": "", "verification_token_expires_at": ""},
+            }
+        )
+        raise HTTPException(status_code=400, detail="Too many failed verification attempts. Please request a new code.")
+        
     token = user.get("verification_token")
     expires_str = user.get("verification_token_expires_at")
     if not token or token != payload.token:
+        await db.users.update_one(
+            {"id": user["id"]},
+            {"$inc": {"verification_attempts": 1}}
+        )
         raise HTTPException(status_code=400, detail="Invalid verification token")
     if expires_str and datetime.fromisoformat(expires_str) < utcnow():
         raise HTTPException(status_code=400, detail="Verification token has expired")
@@ -435,13 +508,13 @@ async def verify_email(payload: VerifyEmailIn):
         {"id": user["id"]},
         {
             "$set": {"email_verified": True},
-            "$unset": {"verification_token": "", "verification_token_expires_at": ""},
+            "$unset": {"verification_token": "", "verification_token_expires_at": "", "verification_attempts": ""},
         }
     )
     return {"message": "Email verified successfully"}
 
 
-@api.post("/auth/resend-verification")
+@api.post("/auth/resend-verification", dependencies=[Depends(limit_auth_requests)])
 async def resend_verification(payload: ForgotIn, background_tasks: BackgroundTasks):
     user = await db.users.find_one({"email": payload.email.lower()})
     if not user:
@@ -456,6 +529,7 @@ async def resend_verification(payload: ForgotIn, background_tasks: BackgroundTas
             "$set": {
                 "verification_token": v_token,
                 "verification_token_expires_at": v_expires,
+                "verification_attempts": 0,
             }
         }
     )
@@ -474,13 +548,15 @@ async def resend_verification(payload: ForgotIn, background_tasks: BackgroundTas
     """
     background_tasks.add_task(send_email, payload.email.lower(), "Shadow Nexus - Verify Email Code", html)
     
-    return {
+    ret = {
         "message": "Verification email resent.",
-        "verification_token_demo": v_token,
     }
+    if ENABLE_DEMO_TOKENS:
+        ret["verification_token_demo"] = v_token
+    return ret
 
 
-@api.post("/auth/forgot-password")
+@api.post("/auth/forgot-password", dependencies=[Depends(limit_auth_requests)])
 async def forgot(payload: ForgotIn, background_tasks: BackgroundTasks):
     user = await db.users.find_one({"email": payload.email.lower()})
     reset_token = str(uuid.uuid4()) if user else None
@@ -507,10 +583,12 @@ async def forgot(payload: ForgotIn, background_tasks: BackgroundTasks):
         """
         background_tasks.add_task(send_email, payload.email.lower(), "Shadow Nexus - Password Reset Request", html)
         
-    return {
+    ret = {
         "message": "If an account exists with this email, a reset link has been sent.",
-        "reset_token_demo": reset_token,
     }
+    if ENABLE_DEMO_TOKENS and reset_token:
+        ret["reset_token_demo"] = reset_token
+    return ret
 
 
 @api.get("/auth/me")
@@ -757,7 +835,7 @@ async def npcs_trust_pre(user=Depends(get_current_user)):
 
 
 @api.post("/npcs/generate-portraits")
-async def generate_portraits():
+async def generate_portraits(user=Depends(get_current_user)):
     """Generate anime-style portraits for every NPC (cached idempotent)."""
     results: Dict[str, str] = {}
     for n in NPCS:
@@ -779,7 +857,7 @@ async def generate_portraits():
 
 
 @api.post("/npcs/regenerate-portrait/{npc_id}")
-async def regenerate_portrait(npc_id: str):
+async def regenerate_portrait(npc_id: str, user=Depends(get_current_user)):
     if not any(n["id"] == npc_id for n in NPCS):
         raise HTTPException(status_code=404, detail="NPC not found")
     png = await generate_portrait_bytes(npc_id)
@@ -980,10 +1058,12 @@ async def daily(user=Depends(get_current_user)):
 # ---------- Leaderboard ----------
 @api.get("/leaderboard")
 async def leaderboard(limit: int = 25):
-    cursor = db.characters.find({}, {"_id": 0, "name": 1, "avatar_id": 1, "cyber_class": 1, "level": 1, "total_xp": 1, "reputation": 1})
-    rows = await cursor.to_list(limit * 4)
-    rows.sort(key=lambda r: (r.get("level", 0), r.get("total_xp", 0), r.get("reputation", 0)), reverse=True)
-    return [{"rank": i + 1, **r} for i, r in enumerate(rows[:limit])]
+    cursor = db.characters.find(
+        {}, 
+        {"_id": 0, "name": 1, "avatar_id": 1, "cyber_class": 1, "level": 1, "total_xp": 1, "reputation": 1}
+    ).sort([("level", -1), ("total_xp", -1), ("reputation", -1)]).limit(limit)
+    rows = await cursor.to_list(length=limit)
+    return [{"rank": i + 1, **r} for i, r in enumerate(rows)]
 
 
 # ---------- Combat (stateless preview) ----------
@@ -1330,6 +1410,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    return response
+
 
 @app.on_event("startup")
 async def startup():
@@ -1337,6 +1426,7 @@ async def startup():
     await db.users.create_index("email", unique=True)
     await db.users.create_index("username", unique=True)
     await db.characters.create_index("user_id", unique=True)
+    await db.characters.create_index([("level", -1), ("total_xp", -1), ("reputation", -1)])
     await db.npc_conversations.create_index([("user_id", 1), ("npc_id", 1)])
     log.info("Shadow Nexus backend started.")
 

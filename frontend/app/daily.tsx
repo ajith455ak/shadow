@@ -19,7 +19,7 @@ export default function DailyChallenges() {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
       <Pressable onPress={() => router.back()}><MonoText style={{ color: COLORS.cyan, marginBottom: 8 }}>← Back</MonoText></Pressable>
-      <NeonLabel color={COLORS.amber}>// daily_directives</NeonLabel>
+      <NeonLabel color={COLORS.amber}>{"// daily_directives"}</NeonLabel>
       <TitleText style={styles.title}>DAILY OPS</TitleText>
       <MutedText style={{ marginBottom: 18, marginTop: 6 }}>Reset every 24 hours. Stack rewards while the grid sleeps.</MutedText>
 

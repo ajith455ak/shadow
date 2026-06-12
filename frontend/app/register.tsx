@@ -64,7 +64,7 @@ export default function RegisterScreen() {
     <View style={styles.root}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <NeonLabel color={COLORS.purple}>// new_operative.init</NeonLabel>
+          <NeonLabel color={COLORS.purple}>{"// new_operative.init"}</NeonLabel>
           <TitleText style={styles.title}>RECRUIT{"\n"}PROTOCOL</TitleText>
           <MutedText style={{ marginVertical: 12 }}>
             Initialize your operative profile. The grid is waiting.
