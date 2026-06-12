@@ -199,12 +199,52 @@ CODE_PUZZLES = [
         ],
         "correct_index": 0,
     },
+    {
+        "code_template": [
+            "<!-- XSS Vulnerable Input Attribute Escape -->",
+            "<input type=\"text\" value=\"____\" />",
+        ],
+        "answer": "\"><script>alert(1)</script>",
+        "hint": "Break out of the double quotes and inject a script tag, e.g. \"><script>alert(1)</script>",
+        "options": [
+            "\"><script>alert(1)</script>",
+            "admin",
+            "<script>alert(1)</script>",
+            "\" onclick=\"alert(1)",
+        ],
+        "correct_index": 0,
+    },
+    {
+        "code_template": [
+            "# Python Decryption Cipher",
+            "import codecs",
+            "def decrypt(token):",
+            "    # decode the rot13 string:",
+            "    return ____",
+        ],
+        "answer": "codecs.decode(token, 'rot_13')",
+        "hint": "Use codecs.decode(token, 'rot_13') to decrypt ROT13",
+        "options": [
+            "codecs.decode(token, 'rot_13')",
+            "token.encode('rot13')",
+            "hashlib.md5(token)",
+            "token[::-1]",
+        ],
+        "correct_index": 0,
+    },
 ]
 
 
 def get_code_puzzle(session: Dict[str, Any]) -> Dict[str, Any]:
-    if session.get("target", {}).get("id") == "secure_sql_injector":
+    target_id = session.get("target", {}).get("id")
+    if target_id == "secure_sql_injector":
         p = CODE_PUZZLES[2]
+    elif target_id == "helix_corp_perimeter":
+        p = CODE_PUZZLES[3]
+    elif target_id == "dark_web_vault":
+        p = CODE_PUZZLES[4]
+    elif target_id == "phantom_relay":
+        p = CODE_PUZZLES[1]
     else:
         idx = sum(ord(c) for c in session["id"]) % 2
         p = CODE_PUZZLES[idx]
@@ -216,8 +256,15 @@ def get_code_puzzle(session: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def check_code_answer(session: Dict[str, Any], answer: str) -> bool:
-    if session.get("target", {}).get("id") == "secure_sql_injector":
+    target_id = session.get("target", {}).get("id")
+    if target_id == "secure_sql_injector":
         p = CODE_PUZZLES[2]
+    elif target_id == "helix_corp_perimeter":
+        p = CODE_PUZZLES[3]
+    elif target_id == "dark_web_vault":
+        p = CODE_PUZZLES[4]
+    elif target_id == "phantom_relay":
+        p = CODE_PUZZLES[1]
     else:
         idx = sum(ord(c) for c in session["id"]) % 2
         p = CODE_PUZZLES[idx]
@@ -251,8 +298,24 @@ def handle_command(session: Dict[str, Any], cmd: str) -> Tuple[List[Dict[str, An
     def add(text: str, kind: str = "output"):
         out.append({"output": text, "kind": kind})
 
+    if stage == "failed":
+        add("[-] ERROR: Session terminated. Connection closed by remote administrator due to trace detection.", "error")
+        return out, patch
+
     def noise(amount: int):
-        patch["trace_level"] = min(100, session.get("trace_level", 0) + amount)
+        new_trace = min(100, session.get("trace_level", 0) + amount)
+        patch["trace_level"] = new_trace
+        if new_trace >= 100:
+            patch["stage"] = "failed"
+            add("[!] ALERT: Connection traced and terminated by active intrusion detection system!", "error")
+
+    if base in ("clear-logs", "clear_logs", "wipe"):
+        current_trace = session.get("trace_level", 0)
+        new_trace = max(0, current_trace - 30)
+        patch["trace_level"] = new_trace
+        add("[*] Scrubbing system log files...", "output")
+        add(f"[+] Cleaned. Trace level reduced from {current_trace}% to {new_trace}%.", "success")
+        return out, patch
 
     if base == "help":
         add("Available commands:", "info")
@@ -267,6 +330,7 @@ def handle_command(session: Dict[str, Any], cmd: str) -> Tuple[List[Dict[str, An
         add("  ls / cat / chmod    — basic filesystem", "info")
         add("  inject              — open code injection puzzle (priv-esc stage)", "info")
         add("  exfil               — exfiltrate the vault data (final stage)", "info")
+        add("  clear-logs          — scrub system logs to reduce trace level by 30%", "info")
         add("  map                 — render the discovered network map", "info")
         add("  clear               — clear screen", "info")
         return out, patch
@@ -294,6 +358,11 @@ def handle_command(session: Dict[str, Any], cmd: str) -> Tuple[List[Dict[str, An
         add("STAGE 4: DATA EXFILTRATION (Exfil)", "info")
         add("  Run: exfil", "info")
         add("  This extracts the compromised records and finishes the simulation.", "info")
+        add("", "info")
+        add("TRACE DETECTION HAZARDS:", "warning")
+        add("  Certain actions generate trace signature noise. If your trace level", "info")
+        add("  reaches 100%, you will be caught and the connection terminated.", "info")
+        add("  Run: clear-logs  (scrubs trace signature to reduce trace by 30%)", "info")
         add("", "info")
         add("Finally, exit and click 'Claim Rewards' to receive XP and Coins!", "success")
         add("════════════════════════════════════════════════════════", "success")

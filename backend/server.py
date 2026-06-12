@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -11,10 +12,10 @@ from typing import Any, Dict, List, Optional
 import bcrypt
 import jwt
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, status
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, status, BackgroundTasks
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from starlette.middleware.cors import CORSMiddleware
 
 from seed_data import (
@@ -48,6 +49,35 @@ app = FastAPI(title="Shadow Nexus API")
 api = APIRouter(prefix="/api")
 security = HTTPBearer(auto_error=False)
 
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+SMTP_HOST = os.environ.get("SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM_EMAIL = os.environ.get("SMTP_FROM_EMAIL", "")
+
+def send_email(to_email: str, subject: str, html_body: str):
+    if not SMTP_HOST or not SMTP_USERNAME or not SMTP_PASSWORD:
+        log.info(f"[Mock Email] to={to_email} subject='{subject}'")
+        return
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["From"] = SMTP_FROM_EMAIL or SMTP_USERNAME
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.send_message(msg)
+        log.info(f"Email sent successfully to {to_email}")
+    except Exception as e:
+        log.error(f"Failed to send email to {to_email}: {e}")
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("shadow_nexus")
 
@@ -56,7 +86,20 @@ log = logging.getLogger("shadow_nexus")
 class RegisterIn(BaseModel):
     username: str = Field(min_length=3, max_length=24)
     email: EmailStr
-    password: str = Field(min_length=6, max_length=128)
+    password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if not any(c.isupper() for c in v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not any(c.islower() for c in v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one digit")
+        if not any(c in "!@#$%^&*()-_=+[]{}|;:',.<>?/~`" for v_char in v for c in [v_char]): # check special chars
+            raise ValueError("Password must contain at least one special character")
+        return v
 
 
 class LoginIn(BaseModel):
@@ -290,14 +333,14 @@ async def root():
 
 
 @api.post("/auth/register")
-async def register(payload: RegisterIn):
+async def register(payload: RegisterIn, background_tasks: BackgroundTasks):
     existing = await db.users.find_one({"email": payload.email.lower()})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     uname_taken = await db.users.find_one({"username": payload.username})
     if uname_taken:
         raise HTTPException(status_code=400, detail="Username already taken")
-    v_token = str(uuid.uuid4())
+    v_token = f"{random.randint(100000, 999999)}"
     v_expires = (utcnow() + timedelta(hours=24)).isoformat()
     user = {
         "id": str(uuid.uuid4()),
@@ -311,6 +354,21 @@ async def register(payload: RegisterIn):
     }
     await db.users.insert_one(user)
     token = create_token(user["id"], remember=False)
+    
+    html = f"""
+    <html>
+      <body style="font-family: sans-serif; background-color: #030305; color: #ffffff; padding: 20px;">
+        <h2 style="color: #00FF41;">// Shadow Nexus Verification</h2>
+        <p>Welcome, agent. Complete email verification using this OTP code:</p>
+        <div style="background-color: #0c0c12; border: 1px solid #00FF41; padding: 12px; font-family: monospace; display: inline-block; font-size: 24px; font-weight: bold; letter-spacing: 4px; margin: 10px 0;">
+          {v_token}
+        </div>
+        <p style="color: #888888; font-size: 11px;">This code will expire in 24 hours.</p>
+      </body>
+    </html>
+    """
+    background_tasks.add_task(send_email, payload.email.lower(), "Shadow Nexus - Verify Email Code", html)
+    
     return {
         "token": token,
         "user": {"id": user["id"], "username": user["username"], "email": user["email"]},
@@ -359,13 +417,13 @@ async def verify_email(payload: VerifyEmailIn):
 
 
 @api.post("/auth/resend-verification")
-async def resend_verification(payload: ForgotIn):
+async def resend_verification(payload: ForgotIn, background_tasks: BackgroundTasks):
     user = await db.users.find_one({"email": payload.email.lower()})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if user.get("email_verified", False):
         return {"message": "Email already verified"}
-    v_token = str(uuid.uuid4())
+    v_token = f"{random.randint(100000, 999999)}"
     v_expires = (utcnow() + timedelta(hours=24)).isoformat()
     await db.users.update_one(
         {"id": user["id"]},
@@ -376,6 +434,21 @@ async def resend_verification(payload: ForgotIn):
             }
         }
     )
+    
+    html = f"""
+    <html>
+      <body style="font-family: sans-serif; background-color: #030305; color: #ffffff; padding: 20px;">
+        <h2 style="color: #00FF41;">// Shadow Nexus Verification</h2>
+        <p>Here is your resent OTP verification code:</p>
+        <div style="background-color: #0c0c12; border: 1px solid #00FF41; padding: 12px; font-family: monospace; display: inline-block; font-size: 24px; font-weight: bold; letter-spacing: 4px; margin: 10px 0;">
+          {v_token}
+        </div>
+        <p style="color: #888888; font-size: 11px;">This code will expire in 24 hours.</p>
+      </body>
+    </html>
+    """
+    background_tasks.add_task(send_email, payload.email.lower(), "Shadow Nexus - Verify Email Code", html)
+    
     return {
         "message": "Verification email resent.",
         "verification_token_demo": v_token,
@@ -383,9 +456,8 @@ async def resend_verification(payload: ForgotIn):
 
 
 @api.post("/auth/forgot-password")
-async def forgot(payload: ForgotIn):
+async def forgot(payload: ForgotIn, background_tasks: BackgroundTasks):
     user = await db.users.find_one({"email": payload.email.lower()})
-    # Always return success for security, but include simulated reset for dev/demo
     reset_token = str(uuid.uuid4()) if user else None
     if user:
         await db.password_resets.insert_one({
@@ -395,9 +467,24 @@ async def forgot(payload: ForgotIn):
             "expires_at": (utcnow() + timedelta(hours=1)).isoformat(),
             "created_at": utcnow().isoformat(),
         })
+        
+        html = f"""
+        <html>
+          <body style="font-family: sans-serif; background-color: #030305; color: #ffffff; padding: 20px;">
+            <h2 style="color: #FF003C;">// Shadow Nexus Password Reset</h2>
+            <p>You requested a password reset. Complete the process using this token:</p>
+            <div style="background-color: #0c0c12; border: 1px solid #FF003C; padding: 12px; font-family: monospace; display: inline-block; font-size: 16px; margin: 10px 0;">
+              {reset_token}
+            </div>
+            <p style="color: #888888; font-size: 11px;">This link will expire in 1 hour. If you did not request this, ignore this email.</p>
+          </body>
+        </html>
+        """
+        background_tasks.add_task(send_email, payload.email.lower(), "Shadow Nexus - Password Reset Request", html)
+        
     return {
         "message": "If an account exists with this email, a reset link has been sent.",
-        "reset_token_demo": reset_token,  # demo only — would be emailed in production
+        "reset_token_demo": reset_token,
     }
 
 
@@ -967,6 +1054,8 @@ async def hack_crack(payload: HackCrackIn, user=Depends(get_current_user)):
     sess = await db.hack_sessions.find_one({"id": payload.session_id, "user_id": user["id"]}, {"_id": 0})
     if not sess:
         raise HTTPException(status_code=404, detail="Hack session not found")
+    if sess.get("stage") == "failed":
+        raise HTTPException(status_code=400, detail="Session failed. Connection terminated.")
     ok, msg = attempt_crack(sess, payload.guess)
     new_hist = list(sess.get("history", [])) + [{"output": msg, "kind": "success" if ok else "error"}]
     update: Dict[str, Any] = {"history": new_hist[-200:]}
@@ -1004,6 +1093,8 @@ async def hack_inject(payload: HackInjectIn, user=Depends(get_current_user)):
     sess = await db.hack_sessions.find_one({"id": payload.session_id, "user_id": user["id"]}, {"_id": 0})
     if not sess:
         raise HTTPException(status_code=404, detail="Hack session not found")
+    if sess.get("stage") == "failed":
+        raise HTTPException(status_code=400, detail="Session failed. Connection terminated.")
     correct = check_code_answer(sess, payload.answer)
     line = "[+] Injection accepted. Privilege chain extended." if correct else "[-] Injection rejected. Syntax check failed."
     new_hist = list(sess.get("history", [])) + [{"output": line, "kind": "success" if correct else "error"}]
@@ -1026,6 +1117,8 @@ async def hack_complete(payload: HackCompleteIn, user=Depends(get_current_user))
     sess = await db.hack_sessions.find_one({"id": payload.session_id, "user_id": user["id"]}, {"_id": 0})
     if not sess:
         raise HTTPException(status_code=404, detail="Hack session not found")
+    if sess.get("stage") == "failed":
+        raise HTTPException(status_code=400, detail="Session failed. Connection terminated.")
     if not sess.get("exfil_complete"):
         raise HTTPException(status_code=400, detail="Exfiltration not complete")
     if sess.get("claimed"):
@@ -1200,7 +1293,10 @@ async def npcs_trust(user=Depends(get_current_user)):
 
 # Include router & middleware
 app.include_router(api)
-CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:8081,http://localhost:19006,http://127.0.0.1:8081").split(",")
+CORS_ORIGINS = os.environ.get(
+    "CORS_ORIGINS",
+    "http://localhost:8081,http://localhost:8082,http://localhost:8083,http://localhost:8080,http://localhost:19006,http://127.0.0.1:8081,http://127.0.0.1:8082,http://127.0.0.1:8083,http://192.168.1.29:8081,http://192.168.1.29:8082,http://192.168.1.29:8083,http://10.168.213.76:8081,http://10.168.213.76:8082,http://10.168.213.76:8083,http://10.0.2.2:8081,http://10.0.2.2:8082"
+).split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,

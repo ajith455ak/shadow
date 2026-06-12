@@ -6,7 +6,10 @@ import { Platform } from "react-native";
 import { storage } from "@/src/utils/storage";
 
 let BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "";
-if (Platform.OS === "android" && (BASE.includes("localhost") || BASE.includes("127.0.0.1"))) {
+if (Platform.OS === "web" && typeof window !== "undefined") {
+  const host = window.location.hostname;
+  BASE = `http://${host}:8001`;
+} else if (Platform.OS === "android" && (BASE.includes("localhost") || BASE.includes("127.0.0.1"))) {
   BASE = BASE.replace("localhost", "10.0.2.2").replace("127.0.0.1", "10.0.2.2");
 }
 

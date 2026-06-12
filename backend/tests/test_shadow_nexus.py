@@ -24,7 +24,7 @@ def fresh_user(session):
     payload = {
         "username": f"TEST_{suffix}",
         "email": f"TEST_{suffix}@nexus.io",
-        "password": "password123",
+        "password": "SecurePassword123!",
     }
     r = session.post(f"{BASE_URL}/api/auth/register", json=payload)
     assert r.status_code == 200, r.text
@@ -84,7 +84,7 @@ class TestAuth:
         r = session.post(f"{BASE_URL}/api/auth/register", json={
             "username": fresh_user["username"] + "x",
             "email": fresh_user["email"],
-            "password": "password123",
+            "password": "SecurePassword123!",
         })
         assert r.status_code == 400
         assert "email" in r.json().get("detail", "").lower()
@@ -93,7 +93,7 @@ class TestAuth:
         r = session.post(f"{BASE_URL}/api/auth/register", json={
             "username": fresh_user["username"],
             "email": f"alt_{uuid.uuid4().hex[:6]}@nexus.io",
-            "password": "password123",
+            "password": "SecurePassword123!",
         })
         assert r.status_code == 400
         assert "username" in r.json().get("detail", "").lower()
@@ -101,7 +101,7 @@ class TestAuth:
     def test_login_success_and_remember_me(self, session, fresh_user):
         r = session.post(f"{BASE_URL}/api/auth/login", json={
             "email": fresh_user["email"],
-            "password": "password123",
+            "password": "SecurePassword123!",
             "remember_me": True,
         })
         assert r.status_code == 200, r.text
@@ -139,7 +139,7 @@ class TestAuth:
         payload = {
             "username": f"VTEST_{suffix}",
             "email": email,
-            "password": "password123",
+            "password": "SecurePassword123!",
         }
         r = session.post(f"{BASE_URL}/api/auth/register", json=payload)
         assert r.status_code == 200
@@ -150,7 +150,7 @@ class TestAuth:
         # 2. Login should fail because email is not verified
         login_res = session.post(f"{BASE_URL}/api/auth/login", json={
             "email": email,
-            "password": "password123"
+            "password": "SecurePassword123!"
         })
         assert login_res.status_code == 400
         assert "not verified" in login_res.json()["detail"].lower()
@@ -196,7 +196,7 @@ class TestAuth:
         # 8. Login should now succeed
         login_ok = session.post(f"{BASE_URL}/api/auth/login", json={
             "email": email,
-            "password": "password123"
+            "password": "SecurePassword123!"
         })
         assert login_ok.status_code == 200
 
@@ -244,7 +244,7 @@ class TestCharacter:
         suffix = uuid.uuid4().hex[:6]
         reg = session.post(f"{BASE_URL}/api/auth/register", json={
             "username": f"TEST_{suffix}", "email": f"TEST_{suffix}@nexus.io",
-            "password": "password123"})
+            "password": "SecurePassword123!"})
         tok = reg.json()["token"]
         h = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
         r = session.post(f"{BASE_URL}/api/character", json={

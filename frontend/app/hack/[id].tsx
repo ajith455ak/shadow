@@ -185,6 +185,25 @@ export default function HackTerminal() {
     );
   }
 
+  if (session.stage === "failed") {
+    return (
+      <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
+        <View style={[styles.victoryBox, { borderColor: COLORS.red, shadowColor: COLORS.red }]}>
+          <Ionicons name="alert-circle" size={56} color={COLORS.red} />
+          <TitleText style={{ color: COLORS.red, fontSize: 24, marginTop: 12, textAlign: "center" }}>CONNECTION TRACED</TitleText>
+          <MonoText style={{ color: COLORS.textPrimary, marginTop: 14, fontSize: 12, textAlign: "center", lineHeight: 18 }}>
+            Your connection signature was fully resolved by the remote administrator's intrusion detection system. The tunnel was closed and your session was wiped.
+          </MonoText>
+        </View>
+        <NeonButton testID="hack-done-return" label="Return to HQ" color={COLORS.red} variant="solid" onPress={() => router.replace("/dashboard")} />
+        <View style={{ marginTop: 12 }}>
+          <NeonButton testID="hack-new" label="Retry Simulation" small variant="outline" color={COLORS.cyan}
+            onPress={() => router.replace("/hack/new")} />
+        </View>
+      </ScrollView>
+    );
+  }
+
   const tgt = session.target;
 
   return (
@@ -249,7 +268,7 @@ export default function HackTerminal() {
       ) : null}
 
       <View style={styles.quickRow}>
-        {(["nmap " + tgt.ip, "ping " + tgt.ip, "ls", "help", "map"]).map(q => (
+        {(["nmap " + tgt.ip, "ping " + tgt.ip, "clear-logs", "ls", "help", "map"]).map(q => (
           <Pressable key={q} testID={`quick-cmd-${q.split(" ")[0]}`} onPress={() => sendCmd(q)} style={styles.quickCmd}>
             <MonoText style={{ color: COLORS.cyan, fontSize: 10 }}>{q.length > 14 ? q.slice(0, 12) + "…" : q}</MonoText>
           </Pressable>

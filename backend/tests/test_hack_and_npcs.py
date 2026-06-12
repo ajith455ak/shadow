@@ -22,7 +22,7 @@ def user_ctx(session):
     """Register a fresh user + create character; return token+headers."""
     suffix = uuid.uuid4().hex[:8]
     email = f"test_{suffix}@nexus.io"
-    payload = {"username": f"tu_{suffix}", "email": email, "password": "password123"}
+    payload = {"username": f"tu_{suffix}", "email": email, "password": "SecurePassword123!"}
     r = session.post(f"{API}/auth/register", json=payload, timeout=30)
     assert r.status_code == 200, r.text
     data = r.json()
@@ -331,3 +331,110 @@ class TestHack:
         good = session.post(f"{API}/hack/cmd", json={"session_id": sid, "command": "inject ' OR '1'='1"}, headers=h)
         assert good.status_code == 200
         assert good.json()["code_puzzle_solved"] is True
+
+    def test_weak_password_registration(self, session):
+        suffix = uuid.uuid4().hex[:8]
+        # Password too short
+        r = session.post(f"{API}/auth/register", json={
+            "username": f"tu_{suffix}",
+            "email": f"test_{suffix}@nexus.io",
+            "password": "Short1!"
+        })
+        assert r.status_code in (400, 422)
+
+        # Password without uppercase
+        r = session.post(f"{API}/auth/register", json={
+            "username": f"tu_{suffix}",
+            "email": f"test_{suffix}@nexus.io",
+            "password": "nouppercase123!"
+        })
+        assert r.status_code in (400, 422)
+
+        # Password without lowercase
+        r = session.post(f"{API}/auth/register", json={
+            "username": f"tu_{suffix}",
+            "email": f"test_{suffix}@nexus.io",
+            "password": "NOLOWERCASE123!"
+        })
+        assert r.status_code in (400, 422)
+
+        # Password without digit
+        r = session.post(f"{API}/auth/register", json={
+            "username": f"tu_{suffix}",
+            "email": f"test_{suffix}@nexus.io",
+            "password": "NoDigitsPassword!"
+        })
+        assert r.status_code in (400, 422)
+
+        # Password without special char
+        r = session.post(f"{API}/auth/register", json={
+            "username": f"tu_{suffix}",
+            "email": f"test_{suffix}@nexus.io",
+            "password": "NoSpecialChar123"
+        })
+        assert r.status_code in (400, 422)
+
+    def test_trace_level_hazards_and_clear_logs(self, session, user_ctx):
+        h = user_ctx["headers"]
+        r = session.post(f"{API}/hack/start", json={"target": "cyber_academy_sandbox"}, headers=h)
+        assert r.status_code == 200
+        sess = r.json()
+        sid = sess["id"]
+        assert sess["trace_level"] == 0
+
+        # Scan to advance stage so we can ssh
+        r = session.post(f"{API}/hack/cmd", json={"session_id": sid, "command": f"nmap {sess['target']['ip']}"}, headers=h)
+        assert r.status_code == 200
+        sess = r.json()
+        assert sess["trace_level"] > 0
+        first_trace = sess["trace_level"]
+
+        # Run clear-logs to check mitigation
+        r = session.post(f"{API}/hack/cmd", json={"session_id": sid, "command": "clear-logs"}, headers=h)
+        assert r.status_code == 200
+        sess = r.json()
+        assert sess["trace_level"] == 0 or sess["trace_level"] < first_trace
+
+        # Run noise generating commands to force 100% trace
+        # SSH command generates 15 trace noise
+        for _ in range(8):
+            r = session.post(f"{API}/hack/cmd", json={"session_id": sid, "command": f"ssh admin@{sess['target']['ip']}"}, headers=h)
+            assert r.status_code == 200
+            sess = r.json()
+            if sess["stage"] == "failed":
+                break
+
+        assert sess["stage"] == "failed"
+        assert sess["trace_level"] == 100
+
+        # Verify future commands are rejected
+        r = session.post(f"{API}/hack/cmd", json={"session_id": sid, "command": "help"}, headers=h)
+        assert r.status_code == 200
+        assert "ERROR" in r.json()["history"][-1]["output"]
+
+        # Verify other actions are blocked
+        r_crack = session.post(f"{API}/hack/crack", json={"session_id": sid, "guess": "letmein"}, headers=h)
+        assert r_crack.status_code == 400
+
+        r_inject = session.post(f"{API}/hack/inject", json={"session_id": sid, "answer": "bypass"}, headers=h)
+        assert r_inject.status_code == 400
+
+        r_complete = session.post(f"{API}/hack/complete", json={"session_id": sid}, headers=h)
+        assert r_complete.status_code == 400
+
+    def test_xss_and_decryption_target_puzzles(self, session, user_ctx):
+        h = user_ctx["headers"]
+        # Helix Corp Perimeter -> XSS
+        r = session.post(f"{API}/hack/start", json={"target": "helix_corp_perimeter"}, headers=h)
+        assert r.status_code == 200
+        sid_xss = r.json()["id"]
+        p_xss = session.get(f"{API}/hack/{sid_xss}/puzzle", headers=h).json()
+        assert "XSS Vulnerable" in p_xss["code_template"][0]
+
+        # Dark Web Vault -> Decryption
+        r = session.post(f"{API}/hack/start", json={"target": "dark_web_vault"}, headers=h)
+        assert r.status_code == 200
+        sid_dec = r.json()["id"]
+        p_dec = session.get(f"{API}/hack/{sid_dec}/puzzle", headers=h).json()
+        assert "Decryption Cipher" in p_dec["code_template"][0]
+
