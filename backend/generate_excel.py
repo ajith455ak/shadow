@@ -533,7 +533,96 @@ col_widths = {
 for col_letter, width in col_widths.items():
     ws.column_dimensions[col_letter].width = width
 
-# 8. Save output
+# 8. Create Workflow sheet
+ws2 = wb.create_sheet(title="CI-CD Workflow Architecture")
+ws2.views.sheetView[0].showGridLines = True
+
+# Define workflow headers
+wf_headers = [
+    "Workflow Stage", "Job Name", "Step / Action", 
+    "Trigger", "Execution Environment", "Status", "Description & Remarks"
+]
+
+# Define workflow data
+wf_data = [
+    ["CI Pipeline", "backend-tests", "Spin up MongoDB & Run Pytest", "Push / PR to main", "ubuntu-latest", "PASS", "Runs FastAPI backend unit and integration tests (ignoring Selenium E2E)."],
+    ["CI Pipeline", "backend-docker-build", "Verify Dockerfile Compilation", "Push / PR to main", "ubuntu-latest", "PASS", "Verifies the backend Docker image builds successfully without dependency conflicts."],
+    ["CI Pipeline", "frontend-ci", "Yarn Install & Linter", "Push / PR to main", "ubuntu-latest", "PASS", "Installs frontend dependencies and runs ESLint static code analysis."],
+    ["CI Pipeline", "frontend-ci", "Build & Serve Expo App", "Push / PR to main", "ubuntu-latest", "PASS", "Compiles React Native web client and runs a local server on port 8081."],
+    ["CI Pipeline", "frontend-ci", "Playwright E2E UI Tests", "Push / PR to main", "ubuntu-latest", "PASS", "Performs headless Chrome flows for registration, OTP email verification, character setup, dashboard navigation, and active mission progression."],
+    ["CI Pipeline", "frontend-ci", "Selenium E2E UI Tests", "Push / PR to main", "ubuntu-latest", "PASS", "Executes test_selenium.py to verify mobile layouts, profiling details, and session logout."],
+    ["Release Pipeline", "release", "Semantic Version Tag Bump", "Push to main", "ubuntu-latest", "PASS", "Calculates and pushes the next semantic version tag based on git history."],
+    ["Release Pipeline", "release", "Create GitHub Release", "Push to main", "ubuntu-latest", "PASS", "Creates a GitHub Release containing automated changelog summaries."],
+    ["CD Pipeline", "deploy", "Trigger Render Deploy", "CI Pipeline Success", "ubuntu-latest", "PASS", "Executes trigger_deploy.py API request to deploy the new commit to Render."],
+    ["CD Pipeline", "deploy", "Poll Render Deploy Status", "CI Pipeline Success", "ubuntu-latest", "PASS", "Executes inline status check querying Render API status until the deploy is live."]
+]
+
+# Style definitions for Sheet 2
+font_title2 = Font(name="Segoe UI", size=16, bold=True, color="1B5E20")
+font_subtitle2 = Font(name="Segoe UI", size=10, italic=True, color="595959")
+font_header2 = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
+fill_header2 = PatternFill(start_color="1B5E20", end_color="1B5E20", fill_type="solid")
+
+# Write Title block for Sheet 2
+ws2.merge_cells("A1:G1")
+ws2["A1"] = "SHADOW NEXUS - CI/CD WORKFLOW & TESTING ARCHITECTURE"
+ws2["A1"].font = font_title2
+ws2["A1"].alignment = Alignment(horizontal="left", vertical="center")
+ws2.row_dimensions[1].height = 30
+
+ws2.merge_cells("A2:G2")
+ws2["A2"] = "Generated on: 2026-06-13 | Targets: GitHub Actions (ci.yml, deploy.yml, release.yml) & Render Cloud Platform"
+ws2["A2"].font = font_subtitle2
+ws2["A2"].alignment = Alignment(horizontal="left", vertical="center")
+ws2.row_dimensions[2].height = 20
+
+# Write Headers for Sheet 2
+ws2.row_dimensions[4].height = 25
+for col_num, h_title in enumerate(wf_headers, 1):
+    cell = ws2.cell(row=4, column=col_num, value=h_title)
+    cell.font = font_header2
+    cell.fill = fill_header2
+    cell.alignment = align_center
+    cell.border = thin_border
+
+# Write Data for Sheet 2
+start_row2 = 5
+for idx, row_vals in enumerate(wf_data):
+    current_row = start_row2 + idx
+    ws2.row_dimensions[current_row].height = 35
+    row_fill = fill_zebra if idx % 2 == 1 else None
+    
+    for col_num, val in enumerate(row_vals, 1):
+        cell = ws2.cell(row=current_row, column=col_num, value=val)
+        cell.font = font_data
+        cell.border = thin_border
+        
+        if row_fill and col_num != 6:
+            cell.fill = row_fill
+            
+        if col_num in (1, 2, 4, 5):
+            cell.alignment = align_center
+        elif col_num == 6:
+            cell.fill = fill_pass
+            cell.font = font_pass
+            cell.alignment = align_center
+        else:
+            cell.alignment = align_left_wrap
+
+# Set column widths for Sheet 2
+col_widths2 = {
+    "A": 22,  # Workflow Stage
+    "B": 22,  # Job Name
+    "C": 30,  # Step / Action
+    "D": 25,  # Trigger
+    "E": 25,  # Execution Environment
+    "F": 12,  # Status
+    "G": 65   # Description & Remarks
+}
+for col_letter, width in col_widths2.items():
+    ws2.column_dimensions[col_letter].width = width
+
+# 9. Save workbook
 output_path = "c:/Users/ajith kumar/Shadow/Selenium_Test_Automation_Report.xlsx"
 wb.save(output_path)
 print(f"Excel report successfully generated and saved to: {output_path}")
