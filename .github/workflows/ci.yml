@@ -36,6 +36,7 @@ jobs:
           MONGO_URL: mongodb://localhost:27017
           DB_NAME: shadow_test
           JWT_SECRET: testsecretkey123
+          ENABLE_DEMO_TOKENS: 'true'
         run: |
           cd backend
           python -m uvicorn server:app --port 8001 &
@@ -46,6 +47,7 @@ jobs:
           MONGO_URL: mongodb://localhost:27017
           DB_NAME: shadow_test
           JWT_SECRET: testsecretkey123
+          ENABLE_DEMO_TOKENS: 'true'
         run: |
           cd backend
           python -m pytest
