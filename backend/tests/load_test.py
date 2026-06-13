@@ -2,10 +2,18 @@ import asyncio
 import time
 import random
 import sys
-import psutil
-import httpx
 import argparse
 from typing import Dict, List, Any
+
+try:
+    import psutil
+    import httpx
+except ImportError:
+    if "pytest" in sys.modules:
+        import pytest
+        pytest.skip("psutil or httpx not installed, skipping load test script", allow_module_level=True)
+    else:
+        raise
 
 BASE_URL = "http://localhost:8001/api"
 

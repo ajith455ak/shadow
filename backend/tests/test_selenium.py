@@ -2,15 +2,27 @@ import os
 import re
 import random
 import time
+import sys
 import pytest
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import StaleElementReferenceException, ElementNotInteractableException
+
+try:
+    from selenium import webdriver
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.common.exceptions import StaleElementReferenceException, ElementNotInteractableException
+except ImportError:
+    if "pytest" in sys.modules:
+        pytest.skip("selenium not installed, skipping selenium tests", allow_module_level=True)
+    else:
+        raise
 
 CHROME_PATH = r"C:\Users\ajith kumar\AppData\Local\ms-playwright\chromium-1223\chrome-win64\chrome.exe"
+if not os.path.exists(CHROME_PATH):
+    if "pytest" in sys.modules:
+        pytest.skip("Chrome binary not found at specified path, skipping selenium tests", allow_module_level=True)
+
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:8081")
 
 # Generate a unique operative for testing
