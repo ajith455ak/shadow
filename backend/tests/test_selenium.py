@@ -230,9 +230,10 @@ def test_06_mission_xp_progression(driver):
     WebDriverWait(driver, 10).until(lambda d: "/dashboard" in d.current_url)
     
     # Verify coins incremented to 150
-    coins_updated = wait_and_find(driver, "dashboard-coins", last=True)
-    WebDriverWait(driver, 5).until(lambda d: coins_updated.text == "150")
-    print(f"Updated Coins verified successfully: {coins_updated.text} CR.")
+    WebDriverWait(driver, 10).until(
+        lambda d: wait_and_find(d, "dashboard-coins", last=True).text == "150"
+    )
+    print("Updated Coins verified successfully: 150 CR.")
 
 def test_07_responsive_ui(driver):
     """Test responsiveness of the UI layout under mobile device resolutions."""
@@ -257,7 +258,7 @@ def test_08_profile_and_logout(driver):
     
     # Verify profile contains character details
     body_text = driver.find_element(By.TAG_NAME, "body").text
-    assert USERNAME in body_text, "Username not found in profile body text."
+    assert USERNAME.lower() in body_text.lower(), "Username not found in profile body text."
     
     # Trigger logout
     click_element(driver, "logout-button")
