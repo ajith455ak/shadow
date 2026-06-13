@@ -169,10 +169,31 @@ const assert = require('assert');
     assert.strictEqual(newCoins, "150", "Coins should have updated to 150");
 
     console.log("=== ALL E2E UI TEST CHECKS PASSED ===");
+    
+    // Success screenshot
+    const fs = require('fs');
+    if (!fs.existsSync('screenshots')){
+        fs.mkdirSync('screenshots');
+    }
+    await page.screenshot({ path: 'screenshots/success.png', fullPage: true });
+    console.log("Success screenshot saved to screenshots/success.png");
 
   } catch (error) {
     console.error("!!! E2E TEST CRITICAL FAILURE !!!");
     console.error(error);
+    
+    // Failure screenshot
+    const fs = require('fs');
+    try {
+      if (!fs.existsSync('screenshots')){
+          fs.mkdirSync('screenshots');
+      }
+      await page.screenshot({ path: 'screenshots/failure.png', fullPage: true });
+      console.log("Failure screenshot saved to screenshots/failure.png");
+    } catch (e) {
+      console.error("Failed to take failure screenshot:", e);
+    }
+    
     process.exit(1);
   } finally {
     await browser.close();
