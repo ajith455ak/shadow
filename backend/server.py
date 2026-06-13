@@ -395,6 +395,8 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 async def limit_auth_requests(request: Request):
+    if ENABLE_DEMO_TOKENS:
+        return
     client_ip = get_client_ip(request)
     if not auth_limiter.is_allowed(client_ip):
         raise HTTPException(
