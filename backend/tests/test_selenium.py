@@ -19,9 +19,6 @@ except ImportError:
         raise
 
 CHROME_PATH = r"C:\Users\ajith kumar\AppData\Local\ms-playwright\chromium-1223\chrome-win64\chrome.exe"
-if not os.path.exists(CHROME_PATH):
-    if "pytest" in sys.modules:
-        pytest.skip("Chrome binary not found at specified path, skipping selenium tests", allow_module_level=True)
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:8081")
 
@@ -34,7 +31,8 @@ PASSWORD = "SecurePassword123!"
 @pytest.fixture(scope="module")
 def driver():
     options = Options()
-    options.binary_location = CHROME_PATH
+    if os.path.exists(CHROME_PATH):
+        options.binary_location = CHROME_PATH
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1280,720")

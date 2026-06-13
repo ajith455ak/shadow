@@ -53,7 +53,7 @@ jobs:
           ENABLE_DEMO_TOKENS: 'true'
         run: |
           cd backend
-          python -m pytest
+          python -m pytest --ignore=tests/test_selenium.py
 
   frontend-ci:
     runs-on: ubuntu-latest
@@ -124,6 +124,17 @@ jobs:
           ENABLE_DEMO_TOKENS: 'true'
         run: |
           node e2e_test.js > e2e_report.log 2>&1
+
+      - name: Run E2E Selenium Tests
+        env:
+          MONGO_URL: mongodb://localhost:27017
+          DB_NAME: shadow_test
+          JWT_SECRET: testsecretkey123
+          ENABLE_DEMO_TOKENS: 'true'
+          FRONTEND_URL: http://localhost:8081
+        run: |
+          cd ../backend
+          python -m pytest tests/test_selenium.py -v
 
       - name: Upload E2E Test Reports
         if: always()
