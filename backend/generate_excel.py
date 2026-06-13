@@ -1,6 +1,7 @@
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+import os
 
 # 1. Create workbook and active sheet
 wb = openpyxl.Workbook()
@@ -623,6 +624,10 @@ for col_letter, width in col_widths2.items():
     ws2.column_dimensions[col_letter].width = width
 
 # 9. Save workbook
-output_path = "c:/Users/ajith kumar/Shadow/Selenium_Test_Automation_Report.xlsx"
+output_path = os.environ.get("EXCEL_REPORT_PATH", "Selenium_Test_Automation_Report.xlsx")
+local_dir = "c:/Users/ajith kumar/Shadow"
+if os.path.exists(local_dir):
+    output_path = os.path.join(local_dir, "Selenium_Test_Automation_Report.xlsx")
+
 wb.save(output_path)
 print(f"Excel report successfully generated and saved to: {output_path}")

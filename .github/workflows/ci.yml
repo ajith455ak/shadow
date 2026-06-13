@@ -205,3 +205,17 @@ jobs:
         run: |
           cp backend/generate_summary.py .
           python generate_summary.py
+
+      - name: Install Openpyxl dependency
+        run: |
+          python -m pip install openpyxl
+
+      - name: Generate Excel Automation Report
+        run: |
+          python backend/generate_excel.py
+
+      - name: Upload Excel Report Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Excel-Automation-Report
+          path: Selenium_Test_Automation_Report.xlsx

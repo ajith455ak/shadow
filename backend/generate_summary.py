@@ -144,6 +144,13 @@ def main():
     if backend_cases:
         md.append(render_details_table(backend_cases, "Pytest Backend Test Verification Details", "backend-details"))
         
+    # Add link to Excel Artifacts
+    repo = os.getenv("GITHUB_REPOSITORY", "")
+    run_id = os.getenv("GITHUB_RUN_ID", "")
+    if repo and run_id:
+        md.append("\n## 📥 Test Artifacts & Downloads\n")
+        md.append(f"- **[Download Excel Test Automation Report](https://github.com/{repo}/actions/runs/{run_id}#artifacts)**: Access the complete Excel sheet containing E2E test cases and pipeline architecture details.\n")
+
     # Write to step summary if env exists, else output to file
     summary_path = os.getenv("GITHUB_STEP_SUMMARY")
     if summary_path:
