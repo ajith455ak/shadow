@@ -247,3 +247,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     asyncio.run(run_load_test(args.concurrency))
+
+
+def test_load_test_sanity():
+    tracker = MetricsTracker()
+    assert tracker.successes == 0
+    assert tracker.errors == 0
