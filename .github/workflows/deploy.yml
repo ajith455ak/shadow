@@ -26,8 +26,8 @@ jobs:
           cd backend
           python trigger_deploy.py > deploy_res.json
           cat deploy_res.json
-          # Extract the deploy ID from the json response
-          DEPLOY_ID=$(python -c "import json; print(json.load(open('deploy_res.json'))['id'])")
+          # Extract the deploy ID from the json response (locating the JSON block)
+          DEPLOY_ID=$(python -c "import json; content = open('deploy_res.json').read(); start = content.find('{'); print(json.loads(content[start:])['id'])")
           echo "Triggered Deploy ID: $DEPLOY_ID"
           
           # Query deploy status until live or failed
