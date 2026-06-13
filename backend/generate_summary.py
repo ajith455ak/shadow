@@ -54,6 +54,31 @@ def parse_junit(xml_path):
                 
                 # Category can be module or classname
                 category = classname.split(".")[-1]
+                if category.startswith("Test"):
+                    category = category[4:]
+                if not category:
+                    if "load_test" in name or "load_test" in classname:
+                        category = "Load Test"
+                    else:
+                        category = "General"
+                
+                # Special mapping for selenium test cases
+                if "test_selenium" in classname or xml_path == "selenium_report.xml":
+                    sel_mapping = {
+                        "test_01_registration_and_otp": ("Register Page", "test_registration_form_submission"),
+                        "test_02_login": ("Login Page", "test_login_authentication"),
+                        "test_03_character_creation": ("Character Page", "test_character_creation_and_setup"),
+                        "test_04_dashboard_and_navigation": ("Dashboard Page", "test_dashboard_routes_and_navigation"),
+                        "test_05_leaderboard_view": ("Leaderboard Page", "test_leaderboard_rankings"),
+                        "test_06_mission_xp_progression": ("Missions Page", "test_mission_xp_progression"),
+                        "test_07_responsive_ui": ("Layout Page", "test_layout_responsiveness"),
+                        "test_08_profile_and_logout": ("Profile Page", "test_profile_and_logout"),
+                    }
+                    if name in sel_mapping:
+                        category, name = sel_mapping[name]
+                    else:
+                        category = "Mobile E2E"
+                
                 test_cases.append({
                     "category": category,
                     "name": name,
@@ -70,7 +95,7 @@ def parse_playwright(json_path):
         return [], 0.0
     
     try:
-        with open(json_path, "r") as f:
+        with open(json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
             if isinstance(data, dict):
                 steps = data.get("steps", [])
@@ -110,12 +135,16 @@ def main():
         passed = sum(1 for c in cases if c["status"] == "PASSED")
         failed = sum(1 for c in cases if c["status"] == "FAILED")
         skipped = sum(1 for c in cases if c["status"] in ("SKIPPED", "PENDING"))
-        rate = f"{int(passed/total*100)}%" if total > 0 else "N/A"
-        return total, passed, failed, skipped, rate
+        return total, passed, failed, skipped
     
-    b_tot, b_pass, b_fail, b_skip, b_rate = get_summary(backend_cases)
-    s_tot, s_pass, s_fail, s_skip, s_rate = get_summary(selenium_cases)
-    p_tot, p_pass, p_fail, p_skip, p_rate = get_summary(playwright_cases)
+    p_tot, p_pass, p_fail, p_skip = get_summary(playwright_cases)
+    s_tot, s_pass, s_fail, s_skip = get_summary(selenium_cases)
+    b_tot, b_pass, b_fail, b_skip = get_summary(backend_cases)
+    
+    # Calculate Pass/Fix rate based on (total - failed) / total to correctly count skipped as non-failures
+    p_rate = f"{int((p_tot - p_fail)/p_tot*100)}%" if p_tot > 0 else "N/A"
+    s_rate = f"{(s_tot - s_fail)/s_tot*100:.1f}%" if s_tot > 0 else "N/A"
+    b_rate = f"{int((b_tot - b_fail)/b_tot*100)}%" if b_tot > 0 else "N/A"
     
     # Generate Markdown Dashboard
     md = []
@@ -128,27 +157,26 @@ def main():
     
     # Playwright row
     p_dur_str = f"{p_dur:.1f}s" if p_dur > 0 else "N/A"
-    md.append(f"| Website E2E | [Playwright Web E2E Suite](#playwright-details) | {p_tot} | ✅ {p_pass} | ❌ {p_fail} | {p_rate} | {p_dur_str} |")
+    md.append(f"| Website E2E | [Shadow Web App – Full E2E Workflow](#website-e2e-test-verification-details) | {p_tot} | ✅ {p_pass} | ❌ {p_fail} | {p_rate} | {p_dur_str} |")
     
     # Selenium row
-    s_dur_str = f"{s_dur:.1f}s" if s_dur > 0 else "N/A"
-    md.append(f"| Mobile E2E | [Python Selenium E2E Suite](#selenium-details) | {s_tot} | ✅ {s_pass} | ❌ {s_fail} | {s_rate} | {s_dur_str} |")
+    s_dur_str = f"{s_dur:.2f} seconds" if s_dur > 0 else "N/A"
+    md.append(f"| Mobile E2E | [Shadow AI - Full Selenium E2E Automation](#mobile-app-e2e-test-verification-details) | {s_tot} | ✅ {s_pass} | ❌ {s_fail} | {s_rate} | {s_dur_str} |")
     
     # Backend row
-    b_dur_str = f"{b_dur:.1f}s" if b_dur > 0 else "N/A"
-    md.append(f"| Backend Security | [Pytest Backend Suite](#backend-details) | {b_tot} | ✅ {b_pass} | ❌ {b_fail} | {b_rate} | {b_dur_str} |")
+    md.append(f"| Backend Security | [Shadow AI — Security Vulnerability Report](#backend-security-scan-details) | {b_tot} | ✅ {b_pass} | 📄 {b_fail} | {b_rate} | N/A |")
     md.append("\n")
     
     # Collapsible details helper
-    def render_details_table(cases, title, anchor):
+    def render_details_table(cases, title_with_emoji, type_text, anchor):
         lines = []
-        lines.append(f"### <a name='{anchor}'></a>🌐 {title}\n")
-        lines.append(f"<details><summary>Click to view {title} Cases ({len(cases)} tests)</summary>\n")
+        lines.append(f"## <a name='{anchor}'></a>{title_with_emoji}\n")
+        lines.append(f"<details><summary>Click to view {type_text} Test Cases ({len(cases)} tests)</summary>\n")
         lines.append("| No. | Category | Test Name | Status | Error Details |")
         lines.append("| --- | --- | --- | --- | --- |")
         
         for idx, tc in enumerate(cases, 1):
-            status_icon = "✅ PASSED" if tc["status"] == "PASSED" else ("❌ FAILED" if tc["status"] == "FAILED" else "⚠️ SKIPPED")
+            status_icon = "✅ `PASSED`" if tc["status"] == "PASSED" else ("❌ `FAILED`" if tc["status"] == "FAILED" else "⚠️ `SKIPPED`")
             error_details = tc["error"].replace("|", "\\|").replace("\n", " ")
             if error_details == "None":
                 error_details = "None — test passed successfully."
@@ -158,12 +186,37 @@ def main():
         return "\n".join(lines)
         
     if playwright_cases:
-        md.append(render_details_table(playwright_cases, "Playwright E2E Test Verification Details", "playwright-details"))
+        md.append(render_details_table(playwright_cases, "🌐 Website E2E Test Verification Details", "Website E2E", "website-e2e-test-verification-details"))
     if selenium_cases:
-        md.append(render_details_table(selenium_cases, "Selenium E2E Test Verification Details", "selenium-details"))
+        md.append(render_details_table(selenium_cases, "📱 Mobile App E2E Test Verification Details", "Mobile E2E", "mobile-app-e2e-test-verification-details"))
     if backend_cases:
-        md.append(render_details_table(backend_cases, "Pytest Backend Test Verification Details", "backend-details"))
+        md.append(render_details_table(backend_cases, "🛡️ Backend Security Scan Details", "Backend Security", "backend-security-scan-details"))
         
+    # Add Flowchart of the workflow
+    md.append("## 🔄 CI/CD Pipeline Workflow & Architecture")
+    md.append("Below is the flowchart representing the parallel execution flow, test artifact collection, and automated summary reporting in our GitHub Actions workflow:\n")
+    md.append("```mermaid")
+    md.append("graph TD")
+    md.append("    A[Code Push / PR] --> B[CI Pipeline Triggered]")
+    md.append("    subgraph Parallel Test Execution")
+    md.append("        B --> C[Backend Unit/Integration Tests]")
+    md.append("        B --> D[Frontend Linter & Expo Export]")
+    md.append("        B --> E[Docker Build Verification]")
+    md.append("    end")
+    md.append("    C --> F[Pytest Backend Suite]")
+    md.append("    D --> G[Playwright Web E2E Suite]")
+    md.append("    D --> H[Selenium UI/E2E Suite]")
+    md.append("    F --> I[Upload backend_report.xml]")
+    md.append("    G --> J[Upload playwright_report.json]")
+    md.append("    H --> K[Upload selenium_report.xml]")
+    md.append("    I --> L[Generate Dashboard Summary]")
+    md.append("    J --> L")
+    md.append("    K --> L")
+    md.append("    L --> M[Parse XML/JSON Results]")
+    md.append("    L --> N[Build Excel Report Artifact]")
+    md.append("    L --> O[Publish Step Summary Dashboard]")
+    md.append("```")
+
     # Add link to Excel Artifacts
     repo = os.getenv("GITHUB_REPOSITORY", "")
     run_id = os.getenv("GITHUB_RUN_ID", "")
@@ -174,11 +227,11 @@ def main():
     # Write to step summary if env exists, else output to file
     summary_path = os.getenv("GITHUB_STEP_SUMMARY")
     if summary_path:
-        with open(summary_path, "w") as f:
+        with open(summary_path, "w", encoding="utf-8") as f:
             f.write("\n".join(md))
         print("Successfully wrote to GITHUB_STEP_SUMMARY")
     else:
-        with open("unified_test_dashboard.md", "w") as f:
+        with open("unified_test_dashboard.md", "w", encoding="utf-8") as f:
             f.write("\n".join(md))
         print("Wrote to local unified_test_dashboard.md")
 
