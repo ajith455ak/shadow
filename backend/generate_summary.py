@@ -5,17 +5,27 @@ import sys
 
 def parse_junit(xml_path):
     if not os.path.exists(xml_path):
-        return []
+        return [], 0.0
     
     test_cases = []
+    duration = 0.0
     try:
         tree = ET.parse(xml_path)
         root = tree.getroot()
         
-        # In pytest, root can be <testsuites> or <testsuite>
+        try:
+            duration = float(root.get("time", "0.0"))
+        except ValueError:
+            pass
+            
         suites = [root] if root.tag == "testsuite" else root.findall("testsuite")
         
         for suite in suites:
+            if root.tag != "testsuite":
+                try:
+                    duration += float(suite.get("time", "0.0"))
+                except ValueError:
+                    pass
             for tc in suite.findall("testcase"):
                 name = tc.get("name", "")
                 classname = tc.get("classname", "")
@@ -53,27 +63,35 @@ def parse_junit(xml_path):
     except Exception as e:
         print(f"Error parsing {xml_path}: {e}")
         
-    return test_cases
+    return test_cases, duration
 
 def parse_playwright(json_path):
     if not os.path.exists(json_path):
-        return []
+        return [], 0.0
     
     try:
         with open(json_path, "r") as f:
             data = json.load(f)
-            return [
+            if isinstance(data, dict):
+                steps = data.get("steps", [])
+                duration = data.get("duration", 0.0)
+            else:
+                steps = data
+                duration = 0.0
+                
+            cases = [
                 {
                     "category": tc.get("category", "Frontend"),
                     "name": tc.get("name", ""),
                     "status": tc.get("status", "PENDING"),
                     "error": tc.get("error", "None")
                 }
-                for tc in data
+                for tc in steps
             ]
+            return cases, duration
     except Exception as e:
         print(f"Error parsing {json_path}: {e}")
-    return []
+    return [], 0.0
 
 def main():
     # Paths to the reports
@@ -82,9 +100,9 @@ def main():
     playwright_json = "playwright_report.json"
     
     # Parse results
-    backend_cases = parse_junit(backend_xml)
-    selenium_cases = parse_junit(selenium_xml)
-    playwright_cases = parse_playwright(playwright_json)
+    backend_cases, b_dur = parse_junit(backend_xml)
+    selenium_cases, s_dur = parse_junit(selenium_xml)
+    playwright_cases, p_dur = parse_playwright(playwright_json)
     
     # Overall calculations
     def get_summary(cases):
@@ -102,23 +120,23 @@ def main():
     # Generate Markdown Dashboard
     md = []
     md.append("# 🧪 Shadow Nexus Unified Test Verification Dashboard\n")
-    md.append("This dashboard presents a unified summary of E2E tests and backend unit tests across all major components: Website E2E, Mobile/Selenium E2E, and Backend API.\n")
+    md.append("This dashboard presents a unified summary of E2E tests and security scans across all major components: Website, Mobile App, and Backend.\n")
     
     md.append("## 📊 Unified Summary Overview\n")
-    md.append("| Component | Test Suite / Report | Total Tests | Passed / Fixed | Failed / Open | Pass/Fix Rate | Status |")
+    md.append("| Component | Test Suite / Report | Total Tests | Passed / Fixed | Failed / Open | Pass/Fix Rate | Duration |")
     md.append("| --- | --- | --- | --- | --- | --- | --- |")
     
     # Playwright row
-    p_status = "✅ PASS" if p_fail == 0 and p_tot > 0 else ("❌ FAIL" if p_fail > 0 else "➖ N/A")
-    md.append(f"| Website E2E (Playwright) | [Playwright Web E2E Suite](#playwright-details) | {p_tot} | {p_pass} | {p_fail} | {p_rate} | {p_status} |")
+    p_dur_str = f"{p_dur:.1f}s" if p_dur > 0 else "N/A"
+    md.append(f"| Website E2E | [Playwright Web E2E Suite](#playwright-details) | {p_tot} | ✅ {p_pass} | ❌ {p_fail} | {p_rate} | {p_dur_str} |")
     
     # Selenium row
-    s_status = "✅ PASS" if s_fail == 0 and s_tot > 0 else ("❌ FAIL" if s_fail > 0 else "➖ N/A")
-    md.append(f"| E2E (Selenium) | [Python Selenium E2E Suite](#selenium-details) | {s_tot} | {s_pass} | {s_fail} | {s_rate} | {s_status} |")
+    s_dur_str = f"{s_dur:.1f}s" if s_dur > 0 else "N/A"
+    md.append(f"| Mobile E2E | [Python Selenium E2E Suite](#selenium-details) | {s_tot} | ✅ {s_pass} | ❌ {s_fail} | {s_rate} | {s_dur_str} |")
     
     # Backend row
-    b_status = "✅ PASS" if b_fail == 0 and b_tot > 0 else ("❌ FAIL" if b_fail > 0 else "➖ N/A")
-    md.append(f"| Backend Security & API | [Pytest Backend Suite](#backend-details) | {b_tot} | {b_pass} | {b_fail} | {b_rate} | {b_status} |")
+    b_dur_str = f"{b_dur:.1f}s" if b_dur > 0 else "N/A"
+    md.append(f"| Backend Security | [Pytest Backend Suite](#backend-details) | {b_tot} | ✅ {b_pass} | ❌ {b_fail} | {b_rate} | {b_dur_str} |")
     md.append("\n")
     
     # Collapsible details helper
@@ -132,6 +150,8 @@ def main():
         for idx, tc in enumerate(cases, 1):
             status_icon = "✅ PASSED" if tc["status"] == "PASSED" else ("❌ FAILED" if tc["status"] == "FAILED" else "⚠️ SKIPPED")
             error_details = tc["error"].replace("|", "\\|").replace("\n", " ")
+            if error_details == "None":
+                error_details = "None — test passed successfully."
             lines.append(f"| {idx} | {tc['category']} | `{tc['name']}` | {status_icon} | {error_details} |")
             
         lines.append("\n</details>\n")

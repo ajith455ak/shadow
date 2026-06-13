@@ -25,8 +25,13 @@ const fs = require('fs');
     { id: 7, category: "Missions Page", name: "test_mission_completion_and_coin_reward", status: "PENDING", error: "None" }
   ];
 
+  const startTime = Date.now();
   function saveReport() {
-    fs.writeFileSync('playwright_report.json', JSON.stringify(steps, null, 2));
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    fs.writeFileSync('playwright_report.json', JSON.stringify({
+      duration: parseFloat(elapsed),
+      steps: steps
+    }, null, 2));
   }
   saveReport();
 
