@@ -1,5 +1,6 @@
 const { chromium, expect } = require('@playwright/test');
 const assert = require('assert');
+const fs = require('fs');
 
 (async () => {
   console.log("=== STARTING PLAYWRIGHT E2E UI TEST ===");
@@ -14,11 +15,28 @@ const assert = require('assert');
   const email = `op_${rand}@nexus.io`;
   const password = `P@ssword123!`;
 
+  const steps = [
+    { id: 1, category: "Landing Page", name: "test_navigation_to_register", status: "PENDING", error: "None" },
+    { id: 2, category: "Register Page", name: "test_registration_form_submission", status: "PENDING", error: "None" },
+    { id: 3, category: "Verification Page", name: "test_email_otp_verification", status: "PENDING", error: "None" },
+    { id: 4, category: "Login Page", name: "test_login_authentication", status: "PENDING", error: "None" },
+    { id: 5, category: "Character Page", name: "test_character_creation_and_setup", status: "PENDING", error: "None" },
+    { id: 6, category: "Dashboard Page", name: "test_dashboard_routes_and_navigation", status: "PENDING", error: "None" },
+    { id: 7, category: "Missions Page", name: "test_mission_completion_and_coin_reward", status: "PENDING", error: "None" }
+  ];
+
+  function saveReport() {
+    fs.writeFileSync('playwright_report.json', JSON.stringify(steps, null, 2));
+  }
+  saveReport();
+
   try {
     // 1. Navigate to Register Screen
     console.log("Navigating to register screen...");
     await page.goto('http://localhost:8081/register');
     await page.waitForTimeout(2000);
+    steps[0].status = "PASSED";
+    saveReport();
 
     // 2. Perform User Registration
     console.log(`Registering user: ${username} (${email})...`);
@@ -30,6 +48,8 @@ const assert = require('assert');
     console.log("Submitting registration form...");
     await page.click('[data-testid="register-submit-button"]');
     await page.waitForTimeout(3000);
+    steps[1].status = "PASSED";
+    saveReport();
 
     // 3. Verify Email Screen & Grab Demo OTP
     console.log("Expecting verify email screen redirect...");
@@ -51,6 +71,8 @@ const assert = require('assert');
     console.log("Submitting OTP verification...");
     await page.click('[data-testid="verify-submit-button"]');
     await page.waitForTimeout(3000);
+    steps[2].status = "PASSED";
+    saveReport();
 
     // 4. Login Screen
     console.log("Expecting login screen redirect...");
@@ -61,6 +83,8 @@ const assert = require('assert');
     await page.fill('[data-testid="login-password-input"]', password);
     await page.click('[data-testid="login-submit-button"]');
     await page.waitForTimeout(3000);
+    steps[3].status = "PASSED";
+    saveReport();
 
     // 5. Character Creation
     console.log("Expecting character creation screen redirect...");
@@ -74,6 +98,8 @@ const assert = require('assert');
     await page.click('[data-testid="avatar-avatar_2"]');
     await page.click('[data-testid="create-character-button"]');
     await page.waitForTimeout(4000);
+    steps[4].status = "PASSED";
+    saveReport();
 
     // 6. Dashboard navigation and click checks
     console.log("Expecting Dashboard redirect...");
@@ -138,6 +164,8 @@ const assert = require('assert');
     console.log("Navigating back to Dashboard...");
     await page.goBack();
     await page.waitForTimeout(1500);
+    steps[5].status = "PASSED";
+    saveReport();
 
     // 7. Complete first puzzle mission
     console.log("Engaging first active mission: First Contact...");
@@ -167,11 +195,12 @@ const assert = require('assert');
     const newCoins = await coinsLocator.innerText();
     console.log(`Coins after mission completion: ${newCoins}`);
     assert.strictEqual(newCoins, "150", "Coins should have updated to 150");
+    steps[6].status = "PASSED";
+    saveReport();
 
     console.log("=== ALL E2E UI TEST CHECKS PASSED ===");
     
     // Success screenshot
-    const fs = require('fs');
     if (!fs.existsSync('screenshots')){
         fs.mkdirSync('screenshots');
     }
@@ -182,8 +211,22 @@ const assert = require('assert');
     console.error("!!! E2E TEST CRITICAL FAILURE !!!");
     console.error(error);
     
+    // Mark failed step and subsequent skipped steps
+    let failedFound = false;
+    for (let i = 0; i < steps.length; i++) {
+      if (steps[i].status === "PENDING") {
+        if (!failedFound) {
+          steps[i].status = "FAILED";
+          steps[i].error = error.message || String(error);
+          failedFound = true;
+        } else {
+          steps[i].status = "SKIPPED";
+        }
+      }
+    }
+    saveReport();
+    
     // Failure screenshot
-    const fs = require('fs');
     try {
       if (!fs.existsSync('screenshots')){
           fs.mkdirSync('screenshots');
