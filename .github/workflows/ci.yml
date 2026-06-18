@@ -56,29 +56,14 @@ jobs:
           python -m pytest --ignore=tests/test_selenium.py --junitxml=backend_report.xml
           cp backend_report.xml ../backend_report.xml
 
-      - name: Run Baseline Load Test
-        env:
-          MONGO_URL: mongodb://localhost:27017
-          DB_NAME: shadow_test
-          JWT_SECRET: testsecretkey123
-          ENABLE_DEMO_TOKENS: 'true'
-        run: |
-          cd backend
-          python tests/baseline_load_test.py
-          cat baseline_load_test_report.txt >> $GITHUB_STEP_SUMMARY
-          cp baseline_load_test_report.txt ../baseline_load_test_report.txt
-
       - name: Upload Backend Test Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: backend-report
-          path: |
-            backend_report.xml
-            baseline_load_test_report.txt
+          path: backend_report.xml
 
-
-  frontend-ci:
+  frontend-linter-build:
     runs-on: ubuntu-latest
     services:
       mongodb:
@@ -160,63 +145,76 @@ jobs:
           python -m pytest tests/test_selenium.py -v --junitxml=selenium_report.xml
           cp selenium_report.xml ../selenium_report.xml
 
-      - name: Install Selenium Test Dependencies
-        run: |
-          cd selenium-tests
-          npm install
-
-      - name: E2E Step 1 - User Registration
-        env:
-          FRONTEND_URL: https://shadow-frontend-9oop.onrender.com
-        run: |
-          cd selenium-tests
-          npm run test:register
-
-      - name: E2E Step 2 - Email OTP Verification
-        env:
-          FRONTEND_URL: https://shadow-frontend-9oop.onrender.com
-        run: |
-          cd selenium-tests
-          npm run test:verify
-
-      - name: E2E Step 3 - User Login
-        env:
-          FRONTEND_URL: https://shadow-frontend-9oop.onrender.com
-        run: |
-          cd selenium-tests
-          npm run test:login
-
-      - name: E2E Step 4 - Character Creation
-        env:
-          FRONTEND_URL: https://shadow-frontend-9oop.onrender.com
-        run: |
-          cd selenium-tests
-          npm run test:character
-
-      - name: E2E Step 5 - Dashboard Verification
-        env:
-          FRONTEND_URL: https://shadow-frontend-9oop.onrender.com
-        run: |
-          cd selenium-tests
-          npm run test:dashboard
-
-
-
       - name: Copy Playwright report to root
         if: always()
         run: |
           cp playwright_report.json ../playwright_report.json
 
-      - name: Upload E2E Test Reports
+      - name: Upload Frontend E2E Reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-test-reports
+          name: frontend-reports
           path: |
             frontend/e2e_report.log
             frontend/screenshots/
             playwright_report.json
             selenium_report.xml
+
+  baseline-load-testing:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017:27017
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Start FastAPI Server
+        env:
+          MONGO_URL: mongodb://localhost:27017
+          DB_NAME: shadow_test
+          JWT_SECRET: testsecretkey123
+          ENABLE_DEMO_TOKENS: 'true'
+        run: |
+          cd backend
+          python -m uvicorn server:app --port 8001 &
+          timeout 15s bash -c 'until echo > /dev/tcp/127.0.0.1/8001; do sleep 0.5; done' || (echo "Server failed to start" && exit 1)
+
+      - name: Run Baseline Load Test
+        env:
+          MONGO_URL: mongodb://localhost:27017
+          DB_NAME: shadow_test
+          JWT_SECRET: testsecretkey123
+          ENABLE_DEMO_TOKENS: 'true'
+        run: |
+          cd backend
+          python tests/baseline_load_test.py
+          cp baseline_load_test_report.txt ../baseline_load_test_report.txt
+          cp baseline_load_test_report.json ../baseline_load_test_report.json
+
+      - name: Upload Load Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-report
+          path: |
+            baseline_load_test_report.txt
+            baseline_load_test_report.json
 
   backend-docker-build:
     runs-on: ubuntu-latest
@@ -234,9 +232,207 @@ jobs:
           file: ./backend/Dockerfile
           push: false
 
-  generate-summary:
+  e2e-step-1-register:
     runs-on: ubuntu-latest
-    needs: [backend-tests, frontend-ci]
+    needs: [backend-tests, frontend-linter-build]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Selenium Test Dependencies
+        run: |
+          cd frontend/selenium-tests
+          npm install
+
+      - name: E2E Step 1 - User Registration
+        env:
+          FRONTEND_URL: https://shadow-frontend-9oop.onrender.com
+        run: |
+          cd frontend/selenium-tests
+          npm run test:register
+
+      - name: Upload Step 1 State
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-state-1
+          path: |
+            selenium_js_report.json
+            frontend/selenium-tests/tests/state.json
+
+  e2e-step-2-otp-verification:
+    runs-on: ubuntu-latest
+    needs: e2e-step-1-register
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Selenium Test Dependencies
+        run: |
+          cd frontend/selenium-tests
+          npm install
+
+      - name: Download Step 1 State
+        uses: actions/download-artifact@v4
+        with:
+          name: selenium-state-1
+          path: .
+
+      - name: E2E Step 2 - Email OTP Verification
+        env:
+          FRONTEND_URL: https://shadow-frontend-9oop.onrender.com
+        run: |
+          cd frontend/selenium-tests
+          npm run test:verify
+
+      - name: Upload Step 2 State
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-state-2
+          path: |
+            selenium_js_report.json
+            frontend/selenium-tests/tests/state.json
+
+  e2e-step-3-login:
+    runs-on: ubuntu-latest
+    needs: e2e-step-2-otp-verification
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Selenium Test Dependencies
+        run: |
+          cd frontend/selenium-tests
+          npm install
+
+      - name: Download Step 2 State
+        uses: actions/download-artifact@v4
+        with:
+          name: selenium-state-2
+          path: .
+
+      - name: E2E Step 3 - User Login
+        env:
+          FRONTEND_URL: https://shadow-frontend-9oop.onrender.com
+        run: |
+          cd frontend/selenium-tests
+          npm run test:login
+
+      - name: Upload Step 3 State
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-state-3
+          path: |
+            selenium_js_report.json
+            frontend/selenium-tests/tests/state.json
+
+  e2e-step-4-character-creation:
+    runs-on: ubuntu-latest
+    needs: e2e-step-3-login
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Selenium Test Dependencies
+        run: |
+          cd frontend/selenium-tests
+          npm install
+
+      - name: Download Step 3 State
+        uses: actions/download-artifact@v4
+        with:
+          name: selenium-state-3
+          path: .
+
+      - name: E2E Step 4 - Character Creation
+        env:
+          FRONTEND_URL: https://shadow-frontend-9oop.onrender.com
+        run: |
+          cd frontend/selenium-tests
+          npm run test:character
+
+      - name: Upload Step 4 State
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-state-4
+          path: |
+            selenium_js_report.json
+            frontend/selenium-tests/tests/state.json
+
+  e2e-step-5-dashboard-verification:
+    runs-on: ubuntu-latest
+    needs: e2e-step-4-character-creation
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Selenium Test Dependencies
+        run: |
+          cd frontend/selenium-tests
+          npm install
+
+      - name: Download Step 4 State
+        uses: actions/download-artifact@v4
+        with:
+          name: selenium-state-4
+          path: .
+
+      - name: E2E Step 5 - Dashboard Verification
+        env:
+          FRONTEND_URL: https://shadow-frontend-9oop.onrender.com
+        run: |
+          cd frontend/selenium-tests
+          npm run test:dashboard
+
+      - name: Upload Step 5 State
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-state-5
+          path: |
+            selenium_js_report.json
+            frontend/selenium-tests/tests/state.json
+
+  publish-unified-summary:
+    runs-on: ubuntu-latest
+    needs:
+      - backend-tests
+      - frontend-linter-build
+      - baseline-load-testing
+      - backend-docker-build
+      - e2e-step-1-register
+      - e2e-step-2-otp-verification
+      - e2e-step-3-login
+      - e2e-step-4-character-creation
+      - e2e-step-5-dashboard-verification
     if: always()
     steps:
       - name: Checkout Repository
@@ -249,10 +445,52 @@ jobs:
           path: .
         continue-on-error: true
 
-      - name: Download E2E Reports
+      - name: Download Frontend Reports
         uses: actions/download-artifact@v4
         with:
-          name: e2e-test-reports
+          name: frontend-reports
+          path: .
+        continue-on-error: true
+
+      - name: Download Load Test Report
+        uses: actions/download-artifact@v4
+        with:
+          name: load-test-report
+          path: .
+        continue-on-error: true
+
+      - name: Download Step 1 State
+        uses: actions/download-artifact@v4
+        with:
+          name: selenium-state-1
+          path: .
+        continue-on-error: true
+
+      - name: Download Step 2 State
+        uses: actions/download-artifact@v4
+        with:
+          name: selenium-state-2
+          path: .
+        continue-on-error: true
+
+      - name: Download Step 3 State
+        uses: actions/download-artifact@v4
+        with:
+          name: selenium-state-3
+          path: .
+        continue-on-error: true
+
+      - name: Download Step 4 State
+        uses: actions/download-artifact@v4
+        with:
+          name: selenium-state-4
+          path: .
+        continue-on-error: true
+
+      - name: Download Step 5 State
+        uses: actions/download-artifact@v4
+        with:
+          name: selenium-state-5
           path: .
         continue-on-error: true
 

@@ -86,3 +86,17 @@ android-sdk/
 credentials.json
 *.key
 .credentials
+
+# Test reports and dashboard
+*_report.json
+*_report.xml
+*report.json
+*report.xml
+baseline_load_test_report.*
+unified_test_dashboard.md
+/backend/screenshots/
+/backend/unified_test_dashboard.md
+/backend/backend_report.xml
+/backend/selenium_report.xml
+/backend/playwright_report.json
+
