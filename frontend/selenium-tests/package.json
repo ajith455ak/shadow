@@ -4,7 +4,12 @@
   "description": "Selenium E2E automation tests",
   "main": "index.js",
   "scripts": {
-    "login": "mocha tests/login.test.js --timeout 30000"
+    "login": "mocha tests/login.test.js --timeout 30000",
+    "test:register": "mocha tests/01_register.test.js --timeout 30000",
+    "test:verify": "mocha tests/02_verify.test.js --timeout 30000",
+    "test:login": "mocha tests/03_login.test.js --timeout 30000",
+    "test:character": "mocha tests/04_character.test.js --timeout 30000",
+    "test:dashboard": "mocha tests/05_dashboard.test.js --timeout 30000"
   },
   "dependencies": {},
   "devDependencies": {

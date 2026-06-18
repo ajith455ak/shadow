@@ -145,13 +145,46 @@ jobs:
           python -m pytest tests/test_selenium.py -v --junitxml=selenium_report.xml
           cp selenium_report.xml ../selenium_report.xml
 
-      - name: Run Frontend Selenium JS Tests
+      - name: Install Selenium Test Dependencies
+        run: |
+          cd selenium-tests
+          npm install
+
+      - name: E2E Step 1 - User Registration
         env:
           FRONTEND_URL: http://localhost:8081
         run: |
           cd selenium-tests
-          npm install
-          npm run login
+          npm run test:register
+
+      - name: E2E Step 2 - Email OTP Verification
+        env:
+          FRONTEND_URL: http://localhost:8081
+        run: |
+          cd selenium-tests
+          npm run test:verify
+
+      - name: E2E Step 3 - User Login
+        env:
+          FRONTEND_URL: http://localhost:8081
+        run: |
+          cd selenium-tests
+          npm run test:login
+
+      - name: E2E Step 4 - Character Creation
+        env:
+          FRONTEND_URL: http://localhost:8081
+        run: |
+          cd selenium-tests
+          npm run test:character
+
+      - name: E2E Step 5 - Dashboard Verification
+        env:
+          FRONTEND_URL: http://localhost:8081
+        run: |
+          cd selenium-tests
+          npm run test:dashboard
+
 
       - name: Copy Playwright report to root
         if: always()
