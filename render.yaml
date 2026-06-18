@@ -16,3 +16,14 @@ services:
         sync: false
       - key: ENABLE_DEMO_TOKENS
         value: "false"
+
+  - type: static
+    name: shadow-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: yarn install && npx expo export
+    publishDir: dist
+    envVars:
+      - key: EXPO_PUBLIC_BACKEND_URL
+        value: https://shadow-4cve.onrender.com
+

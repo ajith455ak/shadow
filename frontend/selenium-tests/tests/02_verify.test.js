@@ -19,9 +19,10 @@ describe('Step 2: Email OTP Verification', function () {
   });
 
   it('should verify the email using demo OTP token', async function () {
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:8081';
     console.log(`Navigating to verification page for ${state.email}...`);
     // Pass the email in the query parameter to prefill, or enter it manually
-    await driver.get(`http://localhost:8081/verify-email?email=${encodeURIComponent(state.email)}`);
+    await driver.get(`${baseUrl}/verify-email?email=${encodeURIComponent(state.email)}`);
     
     await driver.wait(until.elementLocated(By.css('[data-testid="verify-email-input"]')), 10000);
     const emailInput = await driver.findElement(By.css('[data-testid="verify-email-input"]'));

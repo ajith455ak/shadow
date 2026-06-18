@@ -19,9 +19,10 @@ describe('Step 5: Dashboard Redirection', function () {
   });
 
   it('should restore session, view dashboard, and verify initial 100 coins', async function () {
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:8081';
     // 1. Establish domain context
     console.log("Navigating to establish local domain context...");
-    await driver.get('http://localhost:8081/login');
+    await driver.get(`${baseUrl}/login`);
 
     // 2. Inject stored localStorage
     console.log("Injecting saved localStorage state...");
@@ -34,7 +35,7 @@ describe('Step 5: Dashboard Redirection', function () {
 
     // 3. Navigate to dashboard
     console.log("Navigating to dashboard...");
-    await driver.get('http://localhost:8081/dashboard');
+    await driver.get(`${baseUrl}/dashboard`);
 
     console.log("Waiting for dashboard route and coins display...");
     await driver.wait(until.urlContains('/dashboard'), 10000);

@@ -19,8 +19,9 @@ describe('Step 3: Login Authentication', function () {
   });
 
   it('should authenticate the user and capture localStorage session state', async function () {
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:8081';
     console.log(`Logging in with email: ${state.email}...`);
-    await driver.get('http://localhost:8081/login');
+    await driver.get(`${baseUrl}/login`);
 
     await driver.wait(until.elementLocated(By.css('[data-testid="login-email-input"]')), 10000);
     await driver.findElement(By.css('[data-testid="login-email-input"]')).sendKeys(state.email);

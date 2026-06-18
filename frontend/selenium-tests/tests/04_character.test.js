@@ -19,9 +19,10 @@ describe('Step 4: Character Creation', function () {
   });
 
   it('should restore the session, open character creation, and create a character', async function () {
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:8081';
     // 1. Navigate to domain to allow setting localStorage
     console.log("Navigating to establish local domain context...");
-    await driver.get('http://localhost:8081/login');
+    await driver.get(`${baseUrl}/login`);
 
     // 2. Inject stored localStorage
     console.log("Injecting saved localStorage state...");
@@ -34,7 +35,7 @@ describe('Step 4: Character Creation', function () {
 
     // 3. Navigate to character creation page
     console.log("Navigating to character creation page...");
-    await driver.get('http://localhost:8081/character-creation');
+    await driver.get(`${baseUrl}/character-creation`);
 
     // Fill character details
     await driver.wait(until.elementLocated(By.css('[data-testid="character-name-input"]')), 10000);

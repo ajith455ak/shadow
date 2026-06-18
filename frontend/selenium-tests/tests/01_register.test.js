@@ -24,8 +24,9 @@ describe('Step 1: Registration', function () {
     // Save registration credentials to state
     saveState({ username, email, password });
 
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:8081';
     console.log(`Registering user: ${username} (${email})...`);
-    await driver.get('http://localhost:8081/register');
+    await driver.get(`${baseUrl}/register`);
     
     // Fill Registration
     await driver.wait(until.elementLocated(By.css('[data-testid="register-username-input"]')), 10000);
