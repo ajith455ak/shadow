@@ -145,6 +145,14 @@ jobs:
           python -m pytest tests/test_selenium.py -v --junitxml=selenium_report.xml
           cp selenium_report.xml ../selenium_report.xml
 
+      - name: Run Frontend Selenium JS Tests
+        env:
+          FRONTEND_URL: http://localhost:8081
+        run: |
+          cd selenium-tests
+          npm install
+          npm run login
+
       - name: Copy Playwright report to root
         if: always()
         run: |

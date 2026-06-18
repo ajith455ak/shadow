@@ -1,0 +1,14 @@
+{
+  "name": "selenium-tests",
+  "version": "1.0.0",
+  "description": "Selenium E2E automation tests",
+  "main": "index.js",
+  "scripts": {
+    "login": "mocha tests/login.test.js --timeout 30000"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "mocha": "^10.2.0",
+    "selenium-webdriver": "^4.10.0"
+  }
+}
