@@ -190,6 +190,9 @@ async def main():
 
     # Also save to UTF-8 file
     report_path = r"C:\Users\ajith kumar\.gemini\antigravity-ide\scratch\baseline_load_test_report.txt"
+    parent_dir = os.path.dirname(report_path)
+    if not os.path.exists(parent_dir):
+        report_path = "baseline_load_test_report.txt"
     try:
         with open(report_path, "w", encoding="utf-8") as f:
             f.write("="*50 + "\n")

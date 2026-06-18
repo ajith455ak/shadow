@@ -56,12 +56,27 @@ jobs:
           python -m pytest --ignore=tests/test_selenium.py --junitxml=backend_report.xml
           cp backend_report.xml ../backend_report.xml
 
+      - name: Run Baseline Load Test
+        env:
+          MONGO_URL: mongodb://localhost:27017
+          DB_NAME: shadow_test
+          JWT_SECRET: testsecretkey123
+          ENABLE_DEMO_TOKENS: 'true'
+        run: |
+          cd backend
+          python tests/baseline_load_test.py
+          cat baseline_load_test_report.txt >> $GITHUB_STEP_SUMMARY
+          cp baseline_load_test_report.txt ../baseline_load_test_report.txt
+
       - name: Upload Backend Test Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: backend-report
-          path: backend_report.xml
+          path: |
+            backend_report.xml
+            baseline_load_test_report.txt
+
 
   frontend-ci:
     runs-on: ubuntu-latest
