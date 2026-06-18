@@ -189,10 +189,7 @@ async def main():
     print("="*50)
 
     # Also save to UTF-8 file
-    report_path = r"C:\Users\ajith kumar\.gemini\antigravity-ide\scratch\baseline_load_test_report.txt"
-    parent_dir = os.path.dirname(report_path)
-    if not os.path.exists(parent_dir):
-        report_path = "baseline_load_test_report.txt"
+    report_path = "baseline_load_test_report.txt"
     try:
         with open(report_path, "w", encoding="utf-8") as f:
             f.write("="*50 + "\n")
@@ -216,6 +213,28 @@ async def main():
             f.write("="*50 + "\n")
     except Exception as e:
         print(f"Could not save report file: {e}")
+
+    # Also save to JSON file
+    json_path = "baseline_load_test_report.json"
+    try:
+        import json
+        report_data = {
+            "concurrency": concurrency,
+            "duration": duration,
+            "actual_duration": round(actual_duration, 2),
+            "total_requests": total_requests,
+            "success_count": global_stats.success_count,
+            "failure_count": global_stats.failure_count,
+            "error_rate": round((global_stats.failure_count / total_requests * 100.0) if total_requests > 0 else 0.0, 2),
+            "rps": round(rps, 2),
+            "avg_latency": round(avg_latency, 2),
+            "min_latency": round(min_latency, 2),
+            "max_latency": round(max_latency, 2)
+        }
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(report_data, f, indent=2)
+    except Exception as e:
+        print(f"Could not save JSON report file: {e}")
 
 if __name__ == "__main__":
     asyncio.run(main())
