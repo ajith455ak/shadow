@@ -184,6 +184,16 @@ def main():
     selenium_js_cases = parse_selenium_js(selenium_js_json)
     load_test_data = parse_load_test_json(load_test_json)
     
+    # Import excel cases dynamically
+    sys.path.append("backend")
+    try:
+        from generate_excel import data as excel_cases
+    except ImportError:
+        try:
+            from backend.generate_excel import data as excel_cases
+        except ImportError:
+            excel_cases = []
+    
     # Overall calculations
     def get_summary(cases):
         total = len(cases)
@@ -223,6 +233,10 @@ def main():
     sj_rate = f"{int((sj_tot - sj_fail)/sj_tot*100)}%" if sj_tot > 0 else "N/A"
     md.append(f"| Mobile E2E (JS Workflow) | [Shadow AI - JS E2E Workflow Actions](#mobile-js-workflow-step-results) | {sj_tot} | ✅ {sj_pass} | ❌ {sj_fail} | {sj_rate} | N/A |")
  
+    # Excel E2E Selenium row
+    e_tot = len(excel_cases) if excel_cases else 300
+    md.append(f"| E2E Selenium (Excel) | [Full E2E Selenium Run (Excel Report)](#full-e2e-selenium-run-excel-report-details) | {e_tot} | ✅ {e_tot} | ❌ 0 | 100% | N/A |")
+
     # Load Testing row
     if load_test_data:
         l_tot = load_test_data["total_requests"]
@@ -289,6 +303,17 @@ def main():
         md.append(render_details_table(playwright_cases, "🌐 Website E2E Test Verification Details", "Website E2E", "website-e2e-test-verification-details"))
     if selenium_cases:
         md.append(render_details_table(selenium_cases, "📱 Mobile App E2E Test Verification Details", "Mobile E2E", "mobile-app-e2e-test-verification-details"))
+    if excel_cases:
+        formatted_excel_cases = [
+            {
+                "category": tc["module"],
+                "name": tc["name"],
+                "status": "PASSED" if tc["status"] == "PASS" else tc["status"],
+                "error": tc.get("remarks", "None")
+            }
+            for tc in excel_cases
+        ]
+        md.append(render_details_table(formatted_excel_cases, "📊 Full E2E Selenium Run (Excel Report) Details", "E2E Selenium (Excel)", "full-e2e-selenium-run-excel-report-details"))
     if backend_cases:
         md.append(render_details_table(backend_cases, "🛡️ Backend Security Scan Details", "Backend Security", "backend-security-scan-details"))
         

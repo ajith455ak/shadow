@@ -4,6 +4,7 @@ const { Builder } = require('selenium-webdriver');
 const chrome = require('selenium-webdriver/chrome');
 
 const stateFile = path.join(__dirname, 'state.json');
+const reportFile = path.join(__dirname, '../../../selenium_js_report.json');
 
 module.exports = {
   saveState: (data) => {
@@ -32,5 +33,27 @@ module.exports = {
       .forBrowser('chrome')
       .setChromeOptions(options)
       .build();
+  },
+  logStepResult: (stepId, category, name, status, errorMsg = "None") => {
+    let report = [];
+    if (fs.existsSync(reportFile)) {
+      try {
+        report = JSON.parse(fs.readFileSync(reportFile, 'utf8'));
+      } catch (e) {
+        report = [];
+      }
+    }
+    // Remove if already exists
+    report = report.filter(item => item.id !== stepId);
+    report.push({
+      id: stepId,
+      category: category,
+      name: name,
+      status: status,
+      error: errorMsg
+    });
+    // Sort by id
+    report.sort((a, b) => a.id - b.id);
+    fs.writeFileSync(reportFile, JSON.stringify(report, null, 2));
   }
 };
