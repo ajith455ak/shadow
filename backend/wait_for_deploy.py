@@ -38,7 +38,8 @@ def write_summary(status, is_success):
             f"| **Deploy ID** | `{deploy_id}` |",
             f"| **Commit SHA** | `{commit_sha}` |",
             f"| **Status** | {status_icon} |",
-            "| **Deployment URL** | [shadow-4cve.onrender.com](https://shadow-4cve.onrender.com) |"
+            "| **Deployment URL (Webpage)** | [shadow-frontend-9oop.onrender.com](https://shadow-frontend-9oop.onrender.com) |",
+            "| **Backend API URL** | [shadow-4cve.onrender.com](https://shadow-4cve.onrender.com) |"
         ]
         try:
             with open(summary_path, "w", encoding="utf-8") as f:
