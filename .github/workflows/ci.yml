@@ -203,9 +203,7 @@ jobs:
           ENABLE_DEMO_TOKENS: 'true'
         run: |
           cd backend
-          # Start FastAPI server in background
-          python -m uvicorn server:app --port 8001 &
-          # Wait until server is reachable
+          # Wait until server is reachable (started in previous step)
           timeout 15s bash -c 'until echo > /dev/tcp/127.0.0.1/8001; do sleep 0.5; done' || (echo "Server failed to start" && exit 1)
           # Small delay to ensure readiness
           sleep 5
