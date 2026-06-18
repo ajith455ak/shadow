@@ -8,48 +8,72 @@ on:
   workflow_dispatch:
 
 jobs:
-  security-scan:
-    name: Security Analysis
+  detect-tech-stack:
+    name: Detect Technology Stack
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect Technology Stack
+      - name: Detect Stack
         run: |
+          echo "Detecting technology stack..."
           echo "### Technology Stack Detected" >> $GITHUB_STEP_SUMMARY
           echo "- **Frontend**: Expo React Native (Web)" >> $GITHUB_STEP_SUMMARY
           echo "- **Backend**: FastAPI (Python)" >> $GITHUB_STEP_SUMMARY
           echo "- **Database**: MongoDB" >> $GITHUB_STEP_SUMMARY
 
-      - name: Secret Detection - Gitleaks
+  secret-detection:
+    name: Secret Detection - Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
-      - name: SAST - Semgrep
+  sast-semgrep:
+    name: SAST - Semgrep
+    needs: [detect-tech-stack, secret-detection]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Run Semgrep
         run: |
           pip install semgrep
           semgrep --config=auto . || true
 
-      - name: Dependency Vulnerability Scan
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    needs: [detect-tech-stack, secret-detection]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Run Dependency Audits
         run: |
-          echo "Scanning dependencies..."
-          # Python safety scan if requirements.txt exists
+          # Python safety scan
           if [ -f backend/requirements.txt ]; then
             pip install safety
             safety check -r backend/requirements.txt || true
           fi
-          # NPM audit if package.json exists
+          # NPM audit
           if [ -f frontend/package.json ]; then
             cd frontend && npm audit || true
           fi
 
-      - name: Generate Security Reports
+  generate-reports:
+    name: Generate Security Reports
+    needs: [sast-semgrep, dependency-scan]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Summary Reports
         run: |
           echo "### Security Scan Summary" >> $GITHUB_STEP_SUMMARY
           echo "✅ **Secret Detection (Gitleaks)**: No leaks detected." >> $GITHUB_STEP_SUMMARY
