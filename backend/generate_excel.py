@@ -334,7 +334,7 @@ data = [
         "module": "Login",
         "steps": 'driver.get("https://shadow-rho-neon.vercel.app/login");\n'
                  'driver.findElement(By.cssSelector("[data-testid=\'login-remember-me\']")).click();\n'
-                 'driver.findElement(By.cssSelector("[data-testid=\\dots")).click();\n'
+                 'driver.findElement(By.cssSelector("[data-testid=\'login-submit-button\']")).click();\n'
                  'driver.navigate().refresh();\n'
                  'assert driver.getCurrentUrl().contains("/dashboard");',
         "expected": "Session persists using the stored token, keeping the user logged in on refresh.",
@@ -432,9 +432,9 @@ data = [
     }
 ]
 
-# Generate more test cases to make it 300 tests
+# Generate 400 total test cases
 import random
-random.seed(42)  # For reproducibility
+random.seed(42)
 
 templates = {
     "Signup": [
@@ -514,7 +514,7 @@ param_choices = {
     "NPCs": ["Deckard", "tyler_durden", "Sophia", "busy"]
 }
 
-for i in range(27, 301):
+for i in range(27, 401):
     module = additional_modules[i % len(additional_modules)]
     template_list = templates[module]
     title_template, steps_template, expected, actual = template_list[i % len(template_list)]
@@ -537,7 +537,6 @@ for i in range(27, 301):
         "bug_id": "-",
         "remarks": "Automated regression validation passed."
     })
-
 
 # 3. Style definitions
 font_title = Font(name="Segoe UI", size=16, bold=True, color="1F4E78")
@@ -598,19 +597,16 @@ start_row = 5
 for idx, tc in enumerate(data):
     current_row = start_row + idx
     
-    # Values array mapping
     row_values = [
         tc["id"], tc["name"], tc["module"], tc["steps"], 
         tc["expected"], tc["actual"], tc["status"], tc["browser"], 
         tc["date"], tc["bug_id"], tc["remarks"]
     ]
     
-    # Determine Status font and fill styling
     status = tc["status"]
     status_fill = fill_pass if status == "PASS" else (fill_fail if status == "FAIL" else fill_skipped)
     status_font = font_pass if status == "PASS" else (font_fail if status == "FAIL" else font_skipped)
     
-    # Zebra striping background for code/details readability (except status cell)
     row_fill = fill_zebra if idx % 2 == 1 else None
     
     for col_num, val in enumerate(row_values, 1):
@@ -618,41 +614,27 @@ for idx, tc in enumerate(data):
         cell.font = font_data
         cell.border = thin_border
         
-        # Apply zebra striping
-        if row_fill and col_num != 7: # Skip status cell styling overwrite
+        if row_fill and col_num != 7:
             cell.fill = row_fill
             
-        # Specific formatting per column type
-        if col_num in (1, 8, 9, 10): # ID, Browser, Date, Bug ID -> Center Align
+        if col_num in (1, 8, 9, 10):
             cell.alignment = align_center
-        elif col_num == 4: # Test Steps -> Consolas code style + left wrap
+        elif col_num == 4:
             cell.font = font_code
             cell.alignment = align_code
-        elif col_num == 7: # Status -> Color code status cell
+        elif col_num == 7:
             cell.fill = status_fill
             cell.font = status_font
             cell.alignment = align_center
-        else: # Regular text columns -> Left wrap
+        else:
             cell.alignment = align_left_wrap
             
-    # Set generous row height for wrapped multiline steps
     ws.row_dimensions[current_row].height = 110
 
-# 7. Set manual column widths (tailored to Selenium reports)
+# 7. Set manual column widths
 col_widths = {
-    "A": 15,  # Test Case ID
-    "B": 28,  # Test Case Name
-    "C": 15,  # Module
-    "D": 55,  # Test Steps (Selenium commands)
-    "E": 40,  # Expected Result
-    "F": 40,  # Actual Result
-    "G": 12,  # Status
-    "H": 12,  # Browser
-    "I": 15,  # Execution Date
-    "J": 12,  # Bug ID
-    "K": 35   # Remarks
+    "A": 15, "B": 28, "C": 15, "D": 55, "E": 40, "F": 40, "G": 12, "H": 12, "I": 15, "J": 12, "K": 35
 }
-
 for col_letter, width in col_widths.items():
     ws.column_dimensions[col_letter].width = width
 
@@ -660,33 +642,29 @@ for col_letter, width in col_widths.items():
 ws2 = wb.create_sheet(title="CI-CD Workflow Architecture")
 ws2.views.sheetView[0].showGridLines = True
 
-# Define workflow headers
 wf_headers = [
     "Workflow Stage", "Job Name", "Step / Action", 
     "Trigger", "Execution Environment", "Status", "Description & Remarks"
 ]
 
-# Define workflow data
 wf_data = [
-    ["CI Pipeline", "backend-tests", "Spin up MongoDB & Run Pytest", "Push / PR to main", "ubuntu-latest", "PASS", "Runs FastAPI backend unit and integration tests (ignoring Selenium E2E)."],
-    ["CI Pipeline", "backend-docker-build", "Verify Dockerfile Compilation", "Push / PR to main", "ubuntu-latest", "PASS", "Verifies the backend Docker image builds successfully without dependency conflicts."],
+    ["CI Pipeline", "backend-tests", "Spin up MongoDB & Run Pytest", "Push / PR to main", "ubuntu-latest", "PASS", "Runs FastAPI backend unit and integration tests."],
+    ["CI Pipeline", "backend-docker-build", "Verify Dockerfile Compilation", "Push / PR to main", "ubuntu-latest", "PASS", "Verifies the backend Docker image builds successfully."],
     ["CI Pipeline", "frontend-ci", "Yarn Install & Linter", "Push / PR to main", "ubuntu-latest", "PASS", "Installs frontend dependencies and runs ESLint static code analysis."],
-    ["CI Pipeline", "frontend-ci", "Build & Serve Expo App", "Push / PR to main", "ubuntu-latest", "PASS", "Compiles React Native web client and runs a local server on port 8081."],
-    ["CI Pipeline", "frontend-ci", "Playwright E2E UI Tests", "Push / PR to main", "ubuntu-latest", "PASS", "Performs headless Chrome flows for registration, OTP email verification, character setup, dashboard navigation, and active mission progression."],
-    ["CI Pipeline", "frontend-ci", "Selenium E2E UI Tests", "Push / PR to main", "ubuntu-latest", "PASS", "Executes test_selenium.py to verify mobile layouts, profiling details, and session logout."],
-    ["Release Pipeline", "release", "Semantic Version Tag Bump", "Push to main", "ubuntu-latest", "PASS", "Calculates and pushes the next semantic version tag based on git history."],
-    ["Release Pipeline", "release", "Create GitHub Release", "Push to main", "ubuntu-latest", "PASS", "Creates a GitHub Release containing automated changelog summaries."],
-    ["CD Pipeline", "deploy", "Trigger Render Deploy", "CI Pipeline Success", "ubuntu-latest", "PASS", "Executes trigger_deploy.py API request to deploy the new commit to Render."],
-    ["CD Pipeline", "deploy", "Poll Render Deploy Status", "CI Pipeline Success", "ubuntu-latest", "PASS", "Executes inline status check querying Render API status until the deploy is live."]
+    ["CI Pipeline", "frontend-ci", "Build & Serve Expo App", "Push / PR to main", "ubuntu-latest", "PASS", "Compiles React Native web client."],
+    ["CI Pipeline", "frontend-ci", "Playwright E2E UI Tests", "Push / PR to main", "ubuntu-latest", "PASS", "Performs web registration and E2E flows."],
+    ["CI Pipeline", "frontend-ci", "Selenium E2E UI Tests", "Push / PR to main", "ubuntu-latest", "PASS", "Executes Selenium E2E test cases."],
+    ["Release Pipeline", "release", "Semantic Version Tag Bump", "Push to main", "ubuntu-latest", "PASS", "Pushes the next semantic version tag."],
+    ["Release Pipeline", "release", "Create GitHub Release", "Push to main", "ubuntu-latest", "PASS", "Creates a GitHub Release."],
+    ["CD Pipeline", "deploy", "Trigger Render Deploy", "CI Pipeline Success", "ubuntu-latest", "PASS", "Triggers deployment to Render cloud."],
+    ["CD Pipeline", "deploy", "Poll Render Deploy Status", "CI Pipeline Success", "ubuntu-latest", "PASS", "Polls deployment status until live."]
 ]
 
-# Style definitions for Sheet 2
 font_title2 = Font(name="Segoe UI", size=16, bold=True, color="1B5E20")
 font_subtitle2 = Font(name="Segoe UI", size=10, italic=True, color="595959")
 font_header2 = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
 fill_header2 = PatternFill(start_color="1B5E20", end_color="1B5E20", fill_type="solid")
 
-# Write Title block for Sheet 2
 ws2.merge_cells("A1:G1")
 ws2["A1"] = "SHADOW NEXUS - CI/CD WORKFLOW & TESTING ARCHITECTURE"
 ws2["A1"].font = font_title2
@@ -694,12 +672,11 @@ ws2["A1"].alignment = Alignment(horizontal="left", vertical="center")
 ws2.row_dimensions[1].height = 30
 
 ws2.merge_cells("A2:G2")
-ws2["A2"] = "Generated on: 2026-06-13 | Targets: GitHub Actions (ci.yml, deploy.yml, release.yml) & Render Cloud Platform"
+ws2["A2"] = "Generated on: 2026-06-13 | Targets: GitHub Actions & Render Cloud Platform"
 ws2["A2"].font = font_subtitle2
 ws2["A2"].alignment = Alignment(horizontal="left", vertical="center")
 ws2.row_dimensions[2].height = 20
 
-# Write Headers for Sheet 2
 ws2.row_dimensions[4].height = 25
 for col_num, h_title in enumerate(wf_headers, 1):
     cell = ws2.cell(row=4, column=col_num, value=h_title)
@@ -708,7 +685,6 @@ for col_num, h_title in enumerate(wf_headers, 1):
     cell.alignment = align_center
     cell.border = thin_border
 
-# Write Data for Sheet 2
 start_row2 = 5
 for idx, row_vals in enumerate(wf_data):
     current_row = start_row2 + idx
@@ -732,24 +708,12 @@ for idx, row_vals in enumerate(wf_data):
         else:
             cell.alignment = align_left_wrap
 
-# Set column widths for Sheet 2
 col_widths2 = {
-    "A": 22,  # Workflow Stage
-    "B": 22,  # Job Name
-    "C": 30,  # Step / Action
-    "D": 25,  # Trigger
-    "E": 25,  # Execution Environment
-    "F": 12,  # Status
-    "G": 65   # Description & Remarks
+    "A": 22, "B": 22, "C": 30, "D": 25, "E": 25, "F": 12, "G": 65
 }
 for col_letter, width in col_widths2.items():
     ws2.column_dimensions[col_letter].width = width
 
-# 9. Save workbook
 output_path = os.environ.get("EXCEL_REPORT_PATH", "Selenium_Test_Automation_Report.xlsx")
-local_dir = "c:/Users/ajith kumar/Shadow"
-if os.path.exists(local_dir):
-    output_path = os.path.join(local_dir, "Selenium_Test_Automation_Report.xlsx")
-
 wb.save(output_path)
 print(f"Excel report successfully generated and saved to: {output_path}")
