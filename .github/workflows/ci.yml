@@ -516,7 +516,7 @@ jobs:
         run: |
           python backend/generate_excel.py
 
-      - name: Generate Step Summary
+      - name: Verify Test Reports summary
         run: |
           cp backend/generate_summary.py .
           python generate_summary.py
