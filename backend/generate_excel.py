@@ -334,7 +334,7 @@ data = [
         "module": "Login",
         "steps": 'driver.get("https://shadow-rho-neon.vercel.app/login");\n'
                  'driver.findElement(By.cssSelector("[data-testid=\'login-remember-me\']")).click();\n'
-                 'driver.findElement(By.cssSelector("[data-testid=\dots")).click();\n'
+                 'driver.findElement(By.cssSelector("[data-testid=\\dots")).click();\n'
                  'driver.navigate().refresh();\n'
                  'assert driver.getCurrentUrl().contains("/dashboard");',
         "expected": "Session persists using the stored token, keeping the user logged in on refresh.",
