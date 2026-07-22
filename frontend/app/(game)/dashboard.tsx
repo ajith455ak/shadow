@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, TouchOpacity, View, TouchableOpacity } from "react-native";
+import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, View, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, FONT, RADII, SHADOW_NATIVE } from "@/src/theme";
 import { api } from "@/src/api/client";
