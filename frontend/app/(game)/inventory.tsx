@@ -74,9 +74,11 @@ export default function Inventory() {
   );
 }
 
+import { Platform } from "react-native";
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.bg },
-  scroll: { padding: 16, paddingTop: 50, paddingBottom: 40 },
+  scroll: { padding: 16, paddingTop: Platform.OS === "ios" ? 64 : 44, paddingBottom: 40 },
   title: { color: COLORS.cyan, fontSize: 28, letterSpacing: 3, marginTop: 4, fontFamily: FONT.heading, fontWeight: "900" },
   equipBox: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: "rgba(255,176,0,0.3)", padding: 14, marginTop: 12 },
   equipRow: { flexDirection: "row", justifyContent: "space-around", marginTop: 12 },

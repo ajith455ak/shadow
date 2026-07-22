@@ -137,9 +137,11 @@ export default function StoryScreen() {
   );
 }
 
+import { Platform } from "react-native";
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.bg },
-  scroll: { padding: 16, paddingTop: 50, paddingBottom: 40 },
+  scroll: { padding: 16, paddingTop: Platform.OS === "ios" ? 64 : 44, paddingBottom: 40 },
   title: { color: COLORS.purple, fontSize: 28, marginTop: 4, marginBottom: 8, letterSpacing: 2, fontFamily: FONT.heading, fontWeight: "900" },
   chapTab: { paddingHorizontal: 16, paddingVertical: 8, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   chHero: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: "rgba(157,0,255,0.3)", overflow: "hidden", marginTop: 12 },

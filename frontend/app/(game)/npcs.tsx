@@ -93,9 +93,11 @@ export default function NPCList() {
   );
 }
 
+import { Platform } from "react-native";
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.bg },
-  scroll: { padding: 16, paddingTop: 50, paddingBottom: 40 },
+  scroll: { padding: 16, paddingTop: Platform.OS === "ios" ? 64 : 44, paddingBottom: 40 },
   title: { color: COLORS.green, fontSize: 28, letterSpacing: 3, marginTop: 4, fontFamily: FONT.heading, fontWeight: "900" },
   card: { flexDirection: "row", alignItems: "center", padding: 12, borderWidth: 1, marginBottom: 10, backgroundColor: COLORS.surface, shadowOpacity: 0.3, shadowRadius: 12 },
   portrait: { width: 60, height: 60, borderWidth: 2, alignItems: "center", justifyContent: "center", backgroundColor: COLORS.surfaceElevated, shadowOpacity: 0.6, shadowRadius: 10, overflow: "hidden" },

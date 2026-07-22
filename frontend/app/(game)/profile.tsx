@@ -90,7 +90,7 @@ export default function Profile() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.bg },
-  scroll: { padding: 16, paddingTop: 50, paddingBottom: 40 },
+  scroll: { padding: 16, paddingTop: Platform.OS === "ios" ? 64 : 44, paddingBottom: 40 },
   title: { color: COLORS.cyan, fontSize: 28, letterSpacing: 3, marginTop: 4, fontFamily: FONT.heading, fontWeight: "900" },
   heroCard: { flexDirection: "row", alignItems: "center", borderWidth: 1, padding: 16, marginTop: 12, backgroundColor: COLORS.surface, shadowOpacity: 0.4, shadowRadius: 14 },
   avatar: { width: 100, height: 100, borderWidth: 2, alignItems: "center", justifyContent: "center", backgroundColor: COLORS.surfaceElevated, shadowOpacity: 0.7, shadowRadius: 14 },
