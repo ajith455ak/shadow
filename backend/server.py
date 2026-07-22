@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 import bcrypt
 import jwt
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, status, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -30,6 +30,7 @@ from seed_data import (
     SKILLS,
 )
 from push_service import build_push_message, send_expo_push_notifications
+from websocket_manager import manager as ws_manager, authenticate_websocket_token
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -1400,6 +1401,89 @@ async def push_test(user=Depends(get_current_user), background_tasks: Background
     
     result = await send_expo_push_notifications(messages)
     return {"success": True, "dispatch_result": result}
+
+
+# ---------- Real-Time WebSockets ----------
+@app.websocket("/ws/hack/{session_id}")
+async def ws_hack_endpoint(websocket: WebSocket, session_id: str, token: Optional[str] = None):
+    if not token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+    try:
+        user_id = authenticate_websocket_token(token, JWT_SECRET, JWT_ALG)
+    except Exception as e:
+        log.warning(f"WebSocket auth failed: {e}")
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    # Verify session ownership
+    sess = await db.hack_sessions.find_one({"id": session_id, "user_id": user_id}, {"_id": 0})
+    if not sess:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    room_id = f"hack_{session_id}"
+    await ws_manager.connect(websocket, room_id=room_id, user_id=user_id)
+
+    try:
+        await ws_manager.send_personal_message({
+            "type": "connected",
+            "session_id": session_id,
+            "stage": sess.get("stage"),
+            "target": sess.get("target", {}).get("name"),
+        }, websocket)
+
+        while True:
+            data = await websocket.receive_json()
+            msg_type = data.get("type")
+
+            if msg_type == "ping":
+                await ws_manager.send_personal_message({"type": "pong"}, websocket)
+            elif msg_type == "command":
+                cmd = data.get("command", "")
+                sess = await db.hack_sessions.find_one({"id": session_id, "user_id": user_id}, {"_id": 0})
+                if sess:
+                    out_lines, patch = handle_command(sess, cmd)
+                    new_hist = list(sess.get("history", [])) + out_lines
+                    update = {"history": new_hist[-200:], **patch}
+                    await db.hack_sessions.update_one({"id": session_id}, {"$set": update})
+                    await ws_manager.broadcast_to_room(room_id, {
+                        "type": "command_output",
+                        "command": cmd,
+                        "output": out_lines,
+                        "stage": patch.get("stage", sess.get("stage")),
+                    })
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+    except Exception as e:
+        log.error(f"WebSocket hack error: {e}")
+        ws_manager.disconnect(websocket)
+
+
+@app.websocket("/ws/chat/{conversation_id}")
+async def ws_chat_endpoint(websocket: WebSocket, conversation_id: str, token: Optional[str] = None):
+    if not token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+    try:
+        user_id = authenticate_websocket_token(token, JWT_SECRET, JWT_ALG)
+    except Exception as e:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    room_id = f"chat_{conversation_id}"
+    await ws_manager.connect(websocket, room_id=room_id, user_id=user_id)
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+            if data.get("type") == "ping":
+                await ws_manager.send_personal_message({"type": "pong"}, websocket)
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+    except Exception as e:
+        ws_manager.disconnect(websocket)
+
 
 
 
