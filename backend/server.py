@@ -31,6 +31,10 @@ from seed_data import (
 )
 from push_service import build_push_message, send_expo_push_notifications
 from websocket_manager import manager as ws_manager, authenticate_websocket_token
+from audit_service import log_audit_event
+from two_factor_service import generate_totp_secret, generate_recovery_codes, get_totp_uri, generate_qr_code_base64, verify_totp_code
+from ai_assistant import generate_assistant_response
+from redis_service import cache
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -216,6 +220,14 @@ class PushRegisterIn(BaseModel):
 
 class PushUnregisterIn(BaseModel):
     expo_push_token: str
+
+
+class TwoFactorVerifyIn(BaseModel):
+    code: str
+
+
+class AssistantQueryIn(BaseModel):
+    query: str
 
 
 # ---------- Helpers ----------
@@ -1483,6 +1495,108 @@ async def ws_chat_endpoint(websocket: WebSocket, conversation_id: str, token: Op
         ws_manager.disconnect(websocket)
     except Exception as e:
         ws_manager.disconnect(websocket)
+
+
+# ---------- 2FA Authentication ----------
+@api.post("/auth/2fa/setup")
+async def two_factor_setup(user=Depends(get_current_user)):
+    secret = generate_totp_secret()
+    recovery_codes = generate_recovery_codes()
+    otp_uri = get_totp_uri(secret, user["email"])
+    qr_b64 = generate_qr_code_base64(otp_uri)
+    
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"temp_2fa_secret": secret, "temp_recovery_codes": recovery_codes}}
+    )
+    return {
+        "secret": secret,
+        "qr_code": qr_b64,
+        "recovery_codes": recovery_codes,
+    }
+
+
+@api.post("/auth/2fa/verify")
+async def two_factor_verify(payload: TwoFactorVerifyIn, user=Depends(get_current_user)):
+    user_doc = await db.users.find_one({"id": user["id"]})
+    secret = user_doc.get("temp_2fa_secret") or user_doc.get("two_factor_secret")
+    if not secret:
+        raise HTTPException(status_code=400, detail="2FA not setup")
+    
+    if not verify_totp_code(secret, payload.code):
+        raise HTTPException(status_code=400, detail="Invalid 2FA authentication code")
+    
+    await db.users.update_one(
+        {"id": user["id"]},
+        {
+            "$set": {
+                "two_factor_enabled": True,
+                "two_factor_secret": secret,
+                "recovery_codes": user_doc.get("temp_recovery_codes", []),
+            },
+            "$unset": {"temp_2fa_secret": "", "temp_recovery_codes": ""}
+        }
+    )
+    await log_audit_event(db, user_id=user["id"], username=user["username"], action="2FA_ENABLED")
+    return {"success": True, "message": "2FA successfully enabled"}
+
+
+@api.post("/auth/2fa/disable")
+async def two_factor_disable(payload: TwoFactorVerifyIn, user=Depends(get_current_user)):
+    user_doc = await db.users.find_one({"id": user["id"]})
+    secret = user_doc.get("two_factor_secret")
+    if not secret or not user_doc.get("two_factor_enabled"):
+        raise HTTPException(status_code=400, detail="2FA is not active")
+    
+    if not verify_totp_code(secret, payload.code):
+        raise HTTPException(status_code=400, detail="Invalid 2FA code")
+    
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"two_factor_enabled": False}, "$unset": {"two_factor_secret": "", "recovery_codes": ""}}
+    )
+    await log_audit_event(db, user_id=user["id"], username=user["username"], action="2FA_DISABLED")
+    return {"success": True, "message": "2FA disabled"}
+
+
+# ---------- AI Intelligence Assistant ----------
+@api.post("/assistant/chat")
+async def assistant_chat(payload: AssistantQueryIn, user=Depends(get_current_user)):
+    char = await db.characters.find_one({"user_id": user["id"]}, {"_id": 0})
+    reply = await generate_assistant_response(payload.query, char, EMERGENT_LLM_KEY)
+    return {"reply": reply}
+
+
+# ---------- Admin & Analytics ----------
+@api.get("/admin/audit-logs")
+async def get_audit_logs(limit: int = 50, user=Depends(get_current_user)):
+    cursor = db.audit_logs.find({}, {"_id": 0}).sort("timestamp", -1).limit(limit)
+    logs = await cursor.to_list(length=limit)
+    return {"logs": logs}
+
+
+@api.get("/admin/analytics")
+async def get_analytics(user=Depends(get_current_user)):
+    total_users = await db.users.count_documents({})
+    total_characters = await db.characters.count_documents({})
+    verified_users = await db.users.count_documents({"email_verified": True})
+    active_push = await db.push_tokens.count_documents({})
+    
+    pipeline = [
+        {"$group": {"_id": "$cyber_class", "count": {"$sum": 1}}}
+    ]
+    class_dist = await db.characters.aggregate(pipeline).to_list(10)
+    
+    return {
+        "metrics": {
+            "total_users": total_users,
+            "total_characters": total_characters,
+            "verified_users": verified_users,
+            "push_devices": active_push,
+            "class_distribution": class_dist,
+        }
+    }
+
 
 
 
