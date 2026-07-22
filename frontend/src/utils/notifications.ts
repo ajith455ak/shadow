@@ -1,32 +1,45 @@
 import { Platform } from "react-native";
-import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import { api } from "@/src/api/client";
 import { isExpoGo } from "@/src/utils/platform";
 
 /**
- * Expo SDK 54 Notification Handler.
- * Sets display behavior for incoming foreground push notifications.
+ * Expo SDK 53/54 Dynamic Notification Module Loader.
+ * Prevents top-level evaluation of `expo-notifications` in Expo Go,
+ * which causes automatic initialization of DevicePushTokenAutoRegistration.
  */
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+async function getNotificationsModule() {
+  if (isExpoGo) {
+    return null;
+  }
+  try {
+    const Notifications = await import("expo-notifications");
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+    return Notifications;
+  } catch (err) {
+    console.log("Failed to dynamically import expo-notifications:", err);
+    return null;
+  }
+}
 
 /**
  * Register device for Expo Push Notifications.
- * Gracefully handles Expo Go vs Development/Production builds.
+ * Returns null cleanly inside Expo Go without throwing runtime exceptions.
  */
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
-  // Expo SDK 54: Expo Go client app does not support remote push notifications.
-  // We return null gracefully without throwing runtime exceptions or showing red screens.
   if (isExpoGo) {
     console.warn("Running in Expo Go. Remote push notifications are disabled.");
     return null;
   }
+
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return null;
 
   let token: string | null = null;
 
