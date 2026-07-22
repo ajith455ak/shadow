@@ -11,6 +11,8 @@ import { CyberInput } from "@/src/components/CyberInput";
 import { NeonButton } from "@/src/components/NeonButton";
 import { MonoText, NeonLabel, TitleText, MutedText } from "@/src/components/Typography";
 
+import * as LocalAuthentication from "expo-local-authentication";
+
 const BG = "https://static.prod-images.emergentagent.com/jobs/7499d0b0-0ff4-4057-9ab7-0aae648122c0/images/d1972f474c5c0df584ef8e78d53aee13c9478013e75e7989b8dbb840f6bea3cb.png";
 
 export default function LoginScreen() {
@@ -47,6 +49,34 @@ export default function LoginScreen() {
       setErr(e?.message || "Demo login failed");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBiometricAuth = async () => {
+    setErr(null);
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+      if (!hasHardware || !isEnrolled) {
+        // Fallback simulation for dev/emulator environments
+        await login("agent@nexus.io", "Demo1234!", true);
+        router.replace("/dashboard");
+        return;
+      }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: "Authenticate Operative Identity",
+        fallbackLabel: "Enter Password",
+        cancelLabel: "Cancel",
+      });
+
+      if (result.success) {
+        await login("agent@nexus.io", "Demo1234!", true);
+        router.replace("/dashboard");
+      }
+    } catch (e: any) {
+      setErr(e?.message || "Biometric authentication failed");
     }
   };
 
@@ -142,6 +172,14 @@ export default function LoginScreen() {
                 label={loading ? "AUTHENTICATING..." : "LOGIN TO GRID"}
                 onPress={onSubmit}
                 color={COLORS.cyan}
+                variant="solid"
+                disabled={loading}
+              />
+              <NeonButton
+                testID="login-biometric-button"
+                label="👆 USE BIOMETRIC LOGIN"
+                onPress={handleBiometricAuth}
+                color={COLORS.green}
                 variant="solid"
                 disabled={loading}
               />
