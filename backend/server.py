@@ -35,6 +35,7 @@ from audit_service import log_audit_event
 from two_factor_service import generate_totp_secret, generate_recovery_codes, get_totp_uri, generate_qr_code_base64, verify_totp_code
 from ai_assistant import generate_assistant_response
 from redis_service import cache
+from seed_data import seed_database_if_empty
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -60,9 +61,16 @@ security = HTTPBearer(auto_error=False)
 @app.get("/api")
 @app.get("/api/")
 @api.get("/")
-@api.get("/health")
+@app.get("/health")
 async def health_check():
     return {"status": "online", "app": "Shadow Nexus", "version": "1.0.0"}
+
+
+@app.on_event("startup")
+async def startup_event():
+    log.info("Shadow Nexus backend starting up...")
+    await seed_database_if_empty(db)
+
 
 
 
@@ -727,9 +735,34 @@ async def chapter_missions(chapter_id: str, user=Depends(get_current_user)):
     return out
 
 
+@api.get("/missions/daily")
+@api.get("/daily-challenges")
+async def get_daily_missions(user=Depends(get_current_user)):
+    cursor = db.daily_challenges.find({}, {"_id": 0})
+    dailies = await cursor.to_list(length=50)
+    if not dailies:
+        await seed_database_if_empty(db)
+        cursor = db.daily_challenges.find({}, {"_id": 0})
+        dailies = await cursor.to_list(length=50)
+    return {"daily_challenges": dailies}
+
+
+@api.get("/missions")
+async def get_missions(user=Depends(get_current_user)):
+    cursor = db.missions.find({}, {"_id": 0})
+    missions = await cursor.to_list(length=100)
+    if not missions:
+        await seed_database_if_empty(db)
+        cursor = db.missions.find({}, {"_id": 0})
+        missions = await cursor.to_list(length=100)
+    return {"missions": missions}
+
+
 @api.get("/missions/{mission_id}")
 async def get_mission(mission_id: str, user=Depends(get_current_user)):
-    mission = next((m for m in MISSIONS if m["id"] == mission_id), None)
+    mission = await db.missions.find_one({"id": mission_id}, {"_id": 0})
+    if not mission:
+        mission = next((m for m in MISSIONS if m["id"] == mission_id), None)
     if not mission:
         raise HTTPException(status_code=404, detail="Mission not found")
     return mission
@@ -1355,6 +1388,73 @@ async def messenger_seed(user=Depends(get_current_user)):
                        text="Remember — the network teaches what books cannot. Trace every packet like a breadcrumb home.",
                        priority="info")
     return {"success": True}
+
+
+# ---------- Missions Engine ----------
+@api.get("/missions/daily")
+async def get_daily_missions(user=Depends(get_current_user)):
+    cursor = db.daily_challenges.find({}, {"_id": 0})
+    dailies = await cursor.to_list(length=50)
+    if not dailies:
+        await seed_database_if_empty(db)
+        cursor = db.daily_challenges.find({}, {"_id": 0})
+        dailies = await cursor.to_list(length=50)
+    return {"daily_challenges": dailies}
+
+
+@api.get("/daily-challenges")
+async def get_daily_challenges_alias(user=Depends(get_current_user)):
+    return await get_daily_missions(user)
+
+
+@api.get("/missions")
+async def get_missions(user=Depends(get_current_user)):
+    cursor = db.missions.find({}, {"_id": 0})
+    missions = await cursor.to_list(length=100)
+    if not missions:
+        await seed_database_if_empty(db)
+        cursor = db.missions.find({}, {"_id": 0})
+        missions = await cursor.to_list(length=100)
+    return {"missions": missions}
+
+
+@api.post("/missions/{mission_id}/accept")
+async def accept_mission(mission_id: str, user=Depends(get_current_user)):
+    mission = await db.missions.find_one({"id": mission_id}, {"_id": 0})
+    if not mission:
+        raise HTTPException(status_code=404, detail="Mission not found")
+    
+    await db.missions.update_one({"id": mission_id}, {"$set": {"status": "active", "accepted_by": user["id"]}})
+    await log_audit_event(db, user_id=user["id"], username=user["username"], action="MISSION_ACCEPTED", resource=mission_id)
+    return {"success": True, "message": f"Mission '{mission['title']}' accepted", "status": "active"}
+
+
+@api.post("/missions/{mission_id}/complete")
+async def complete_mission(mission_id: str, user=Depends(get_current_user)):
+    mission = await db.missions.find_one({"id": mission_id}, {"_id": 0})
+    if not mission:
+        raise HTTPException(status_code=404, detail="Mission not found")
+    
+    # Award XP and coins to user's character
+    char = await db.characters.find_one({"user_id": user["id"]})
+    if char:
+        new_xp = char.get("xp", 0) + mission.get("reward_xp", 100)
+        new_coins = char.get("coins", 0) + mission.get("reward_coins", 150)
+        new_level = max(1, new_xp // 500 + 1)
+        await db.characters.update_one(
+            {"user_id": user["id"]},
+            {"$set": {"xp": new_xp, "coins": new_coins, "level": new_level}}
+        )
+
+    await db.missions.update_one({"id": mission_id}, {"$set": {"status": "completed"}})
+    await log_audit_event(db, user_id=user["id"], username=user["username"], action="MISSION_COMPLETED", resource=mission_id)
+    
+    return {
+        "success": True,
+        "message": f"Mission '{mission['title']}' completed!",
+        "reward_xp": mission.get("reward_xp", 100),
+        "reward_coins": mission.get("reward_coins", 150),
+    }
 
 
 # ---------- Push Notifications ----------

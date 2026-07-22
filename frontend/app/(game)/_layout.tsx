@@ -53,6 +53,16 @@ export default function GameLayout() {
         }}
       />
       <Tabs.Screen
+        name="missions"
+        options={{
+          title: "Missions",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "rocket" : "rocket-outline"} size={focused ? 24 : size} color={color} />
+          ),
+          tabBarTestID: "tab-missions",
+        }}
+      />
+      <Tabs.Screen
         name="npcs"
         options={{
           title: "NPCs",

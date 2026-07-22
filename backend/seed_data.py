@@ -267,3 +267,17 @@ DAILY_TEMPLATES = [
     {"id": "dc_boss_1", "name": "Boss Hunter", "description": "Defeat 1 boss.", "target": 1, "metric": "boss", "rewards": {"coins": 500, "items": ["coin_booster"]}},
     {"id": "dc_npc_3", "name": "Network Builder", "description": "Speak with 3 NPCs.", "target": 3, "metric": "npc_chats", "rewards": {"coins": 150, "xp": 100}},
 ]
+
+
+async def seed_database_if_empty(db):
+    """Seed missions, achievements, daily templates, and items if empty."""
+    m_cnt = await db.missions.count_documents({})
+    if m_cnt == 0:
+        await db.missions.insert_many([m.copy() for m in MISSIONS])
+    a_cnt = await db.achievements.count_documents({})
+    if a_cnt == 0:
+        await db.achievements.insert_many([a.copy() for a in ACHIEVEMENTS])
+    i_cnt = await db.inventory.count_documents({})
+    if i_cnt == 0:
+        await db.inventory.insert_many([it.copy() for it in ITEMS])
+
