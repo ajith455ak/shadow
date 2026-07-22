@@ -37,6 +37,19 @@ export default function LoginScreen() {
     }
   };
 
+  const onDemoLogin = async () => {
+    setErr(null);
+    setLoading(true);
+    try {
+      await login("agent@nexus.io", "Demo1234!", true);
+      router.replace("/dashboard");
+    } catch (e: any) {
+      setErr(e?.message || "Demo login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <View style={styles.mobileRoot}>
       <Image source={{ uri: BG }} style={styles.bgImage} resizeMode="cover" />
@@ -123,13 +136,21 @@ export default function LoginScreen() {
               </View>
             ) : null}
 
-            <View style={{ marginTop: 20 }}>
+            <View style={{ marginTop: 20, gap: 10 }}>
               <NeonButton
                 testID="login-submit-button"
                 label={loading ? "AUTHENTICATING..." : "LOGIN TO GRID"}
                 onPress={onSubmit}
                 color={COLORS.cyan}
                 variant="solid"
+                disabled={loading}
+              />
+              <NeonButton
+                testID="login-demo-button"
+                label="⚡ QUICK DEMO ACCESS"
+                onPress={onDemoLogin}
+                color={COLORS.purple}
+                variant="outline"
                 disabled={loading}
               />
             </View>
