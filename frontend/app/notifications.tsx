@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     borderRadius: RADII.lg,
     paddingVertical: 14,
     flexDirection: "row",
-    justify.content: "center",
+    justifyContent: "center",
     alignItems: "center",
   },
   testBtnText: { color: COLORS.cyan, fontSize: 12, fontWeight: "800", letterSpacing: 1 },
