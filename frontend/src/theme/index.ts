@@ -29,13 +29,26 @@ export const SPACING = { xs: 4, sm: 8, md: 16, lg: 20, xl: 24, xxl: 32 };
 
 export const RADII = { none: 0, sm: 6, md: 12, lg: 16, pill: 999 };
 
-export const SHADOW_NATIVE = {
+const defaultShadow = {
   shadowColor: "#000000",
   shadowOpacity: 0.35,
   shadowRadius: 8,
   shadowOffset: { width: 0, height: 4 },
   elevation: 5,
 };
+
+export const SHADOW_NATIVE = Object.assign(
+  function (color?: string) {
+    return {
+      shadowColor: color || "#000000",
+      shadowOpacity: 0.35,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 5,
+    };
+  },
+  defaultShadow
+);
 
 export const SHADOW_NEON = (color: string) => ({
   shadowColor: color,
