@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, FONT } from "@/src/theme";
 import { api } from "@/src/api/client";
@@ -136,8 +136,6 @@ export default function StoryScreen() {
     </ScrollView>
   );
 }
-
-import { Platform } from "react-native";
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.bg },
