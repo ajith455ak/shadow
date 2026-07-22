@@ -28,7 +28,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login(email.trim(), password, remember);
-      router.replace("/");
+      router.replace("/dashboard");
     } catch (e: any) {
       setErr(e?.message || "Login failed");
     } finally {
