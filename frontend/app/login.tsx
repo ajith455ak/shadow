@@ -1,11 +1,11 @@
 import { useState } from "react";
 import {
   Image, KeyboardAvoidingView, Platform, Pressable, ScrollView,
-  StyleSheet, Switch, View,
+  StyleSheet, Switch, TouchableOpacity, View,
 } from "react-native";
 import { useRouter, Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS, FONT } from "@/src/theme";
+import { COLORS, FONT, RADII, SHADOW_NATIVE } from "@/src/theme";
 import { useAuth } from "@/src/context/AuthContext";
 import { CyberInput } from "@/src/components/CyberInput";
 import { NeonButton } from "@/src/components/NeonButton";
@@ -21,6 +21,7 @@ export default function LoginScreen() {
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const onSubmit = async () => {
     setErr(null);
@@ -37,23 +38,33 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.root}>
-      <Image source={{ uri: BG }} style={styles.bg} resizeMode="cover" />
-      <View style={styles.overlay} />
+    <View style={styles.mobileRoot}>
+      <Image source={{ uri: BG }} style={styles.bgImage} resizeMode="cover" />
+      <View style={styles.darkOverlay} />
+
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <View style={styles.brandBlock}>
-            <NeonLabel color={COLORS.cyan}>{"// shadow_nexus.exe"}</NeonLabel>
-            <TitleText style={styles.title}>SHADOW{"\n"}NEXUS</TitleText>
-            <MutedText style={{ marginTop: 4 }}>
-              The Phantom Grid is awakening. Jack in, Agent.
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          {/* Top Mobile Status Header */}
+          <View style={styles.topBadgeRow}>
+            <View style={styles.fingerprintBadge}>
+              <Ionicons name="finger-print" size={24} color={COLORS.cyan} />
+            </View>
+            <NeonLabel color={COLORS.cyan}>{"// SECURE_AUTH.MOB"}</NeonLabel>
+          </View>
+
+          {/* Brand Heading */}
+          <View style={styles.brandContainer}>
+            <TitleText style={styles.brandTitle}>SHADOW{"\n"}NEXUS</TitleText>
+            <MutedText style={styles.brandSubtitle}>
+              Mobile Stealth Network Access. Enter your operative credentials to connect.
             </MutedText>
           </View>
 
-          <View style={styles.form}>
+          {/* Mobile Login Touch Form */}
+          <View style={styles.mobileFormCard}>
             <CyberInput
               testID="login-email-input"
-              label="Email"
+              label="OPERATIVE EMAIL"
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -61,20 +72,31 @@ export default function LoginScreen() {
               keyboardType="email-address"
               placeholder="agent@nexus.io"
             />
-            <CyberInput
-              testID="login-password-input"
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              placeholder="••••••••"
-            />
 
-            <View style={styles.row}>
-              <Pressable
+            <View style={{ position: "relative" }}>
+              <CyberInput
+                testID="login-password-input"
+                label="ENCRYPTED PASSWORD"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                placeholder="••••••••"
+              />
+              <TouchableOpacity
+                style={styles.eyeBtn}
+                onPress={() => setShowPassword(!showPassword)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={COLORS.cyan} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.rememberRow}>
+              <TouchableOpacity
                 testID="login-remember-toggle"
                 onPress={() => setRemember(!remember)}
-                style={styles.rememberRow}
+                style={styles.switchTouch}
+                activeOpacity={0.7}
               >
                 <Switch
                   value={remember}
@@ -83,56 +105,45 @@ export default function LoginScreen() {
                   thumbColor={COLORS.bg}
                 />
                 <MonoText style={{ marginLeft: 10, color: COLORS.textSecondary, fontSize: 12 }}>
-                  Remember me
+                  Remember Device
                 </MonoText>
-              </Pressable>
+              </TouchableOpacity>
+
               <Link href="/forgot-password" asChild>
-                <Pressable testID="forgot-password-link">
-                  <MonoText style={{ color: COLORS.purple, fontSize: 12 }}>Forgot?</MonoText>
-                </Pressable>
+                <TouchableOpacity testID="forgot-password-link" activeOpacity={0.7}>
+                  <MonoText style={{ color: COLORS.purple, fontSize: 12, fontWeight: "700" }}>Forgot?</MonoText>
+                </TouchableOpacity>
               </Link>
             </View>
 
             {err ? (
-              <View style={{ marginBottom: 12 }}>
-                <MonoText style={{ color: COLORS.red, fontSize: 12 }}>{err}</MonoText>
-                {err.includes("verify your email") ? (
-                  <Link href={{ pathname: "/verify-email", params: { email: email.trim() } }} asChild>
-                    <Pressable testID="go-to-verify-email" style={{ marginTop: 6 }}>
-                      <MonoText style={{ color: COLORS.cyan, fontSize: 12, textDecorationLine: "underline" }}>
-                        Go to verification page &rarr;
-                      </MonoText>
-                    </Pressable>
-                  </Link>
-                ) : null}
+              <View style={styles.errorBox}>
+                <Ionicons name="alert-circle" size={16} color={COLORS.red} style={{ marginRight: 6 }} />
+                <MonoText style={{ color: COLORS.red, fontSize: 12, flex: 1 }}>{err}</MonoText>
               </View>
             ) : null}
 
-            <NeonButton
-              testID="login-submit-button"
-              label="Jack In"
-              onPress={onSubmit}
-              loading={loading}
-              color={COLORS.cyan}
-              variant="solid"
-            />
-
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <MonoText style={{ color: COLORS.textMuted, marginHorizontal: 12, fontSize: 11 }}>OR</MonoText>
-              <View style={styles.dividerLine} />
+            <View style={{ marginTop: 20 }}>
+              <NeonButton
+                testID="login-submit-button"
+                label={loading ? "AUTHENTICATING..." : "LOGIN TO GRID"}
+                onPress={onSubmit}
+                color={COLORS.cyan}
+                variant="solid"
+                disabled={loading}
+              />
             </View>
 
-            <Link href="/register" asChild>
-              <Pressable testID="go-to-register">
-                <View style={styles.altBtn}>
-                  <Ionicons name="person-add-outline" size={16} color={COLORS.purple} />
-                  <MonoText style={{ color: COLORS.purple, marginLeft: 8 }}>
-                    Create new operative
+            <View style={styles.footerRow}>
+              <MutedText style={{ fontSize: 13 }}>New Operative? </MutedText>
+              <Link href="/register" asChild>
+                <TouchableOpacity testID="register-link" activeOpacity={0.7}>
+                  <MonoText style={{ color: COLORS.cyan, fontSize: 13, fontWeight: "800" }}>
+                    REGISTER NOW →
                   </MonoText>
-                </View>
-              </Pressable>
-            </Link>
+                </TouchableOpacity>
+              </Link>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -141,21 +152,31 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.bg },
-  bg: { ...StyleSheet.absoluteFillObject, opacity: 0.35 },
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(3,3,5,0.75)" },
-  scroll: { padding: 24, paddingTop: 80, paddingBottom: 60, flexGrow: 1, justifyContent: "center" },
-  brandBlock: { marginBottom: 40 },
-  title: { fontSize: 44, color: COLORS.cyan, marginTop: 8, lineHeight: 46, fontFamily: FONT.heading, fontWeight: "900", letterSpacing: 4 },
-  form: {
-    backgroundColor: "rgba(10,10,15,0.55)",
-    borderWidth: 1,
-    borderColor: "rgba(0, 240, 255, 0.2)",
-    padding: 24,
+  mobileRoot: { flex: 1, backgroundColor: COLORS.bg },
+  bgImage: { ...StyleSheet.absoluteFillObject, opacity: 0.3 },
+  darkOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(8, 9, 12, 0.85)" },
+  scrollContent: { padding: 24, paddingTop: Platform.OS === "ios" ? 60 : 40, paddingBottom: 40 },
+
+  topBadgeRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 24 },
+  fingerprintBadge: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(0, 240, 255, 0.1)",
+    borderWidth: 1.5, borderColor: COLORS.cyan, justifyContent: "center", alignItems: "center",
+    ...SHADOW_NATIVE(COLORS.cyan),
   },
-  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  rememberRow: { flexDirection: "row", alignItems: "center" },
-  divider: { flexDirection: "row", alignItems: "center", marginVertical: 22 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(0,240,255,0.15)" },
-  altBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 12 },
+
+  brandContainer: { marginBottom: 28 },
+  brandTitle: { fontSize: 36, fontWeight: "900", color: COLORS.textPrimary, letterSpacing: 3, lineHeight: 42 },
+  brandSubtitle: { fontSize: 13, color: COLORS.textSecondary, marginTop: 8, lineHeight: 20 },
+
+  mobileFormCard: {
+    backgroundColor: COLORS.surfaceGlass, borderRadius: RADII.lg, padding: 24,
+    borderWidth: 1, borderColor: COLORS.border, ...SHADOW_NATIVE(COLORS.cyanGlow),
+  },
+
+  eyeBtn: { position: "absolute", right: 12, top: 38, padding: 8 },
+  rememberRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 12, marginBottom: 10 },
+  switchTouch: { flexDirection: "row", alignItems: "center" },
+
+  errorBox: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(239, 68, 68, 0.12)", padding: 12, borderRadius: RADII.md, borderWidth: 1, borderColor: COLORS.red, marginTop: 10 },
+  footerRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 24 },
 });

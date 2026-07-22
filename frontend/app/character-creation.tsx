@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  FlatList, Platform, ScrollView, StyleSheet, TouchableOpacity, View,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS, FONT } from "@/src/theme";
+import { COLORS, FONT, RADII, SHADOW_NATIVE } from "@/src/theme";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { NeonButton } from "@/src/components/NeonButton";
@@ -40,7 +42,7 @@ export default function CharacterCreation() {
 
   const create = async () => {
     setErr(null);
-    if (!name || name.length < 2) { setErr("Enter a codename"); return; }
+    if (!name || name.length < 2) { setErr("Enter an operative callsign (2+ characters)"); return; }
     setLoading(true);
     try {
       await api.post("/character", {
@@ -51,7 +53,7 @@ export default function CharacterCreation() {
       await refresh();
       router.replace("/dashboard");
     } catch (e: any) {
-      setErr(e?.message || "Failed to create");
+      setErr(e?.message || "Failed to create character");
     } finally {
       setLoading(false);
     }
@@ -59,142 +61,168 @@ export default function CharacterCreation() {
 
   if (!avatars.length || !classes.length) {
     return (
-      <View style={[styles.root, { justifyContent: "center", alignItems: "center" }]}>
-        <MutedText>Loading character matrix...</MutedText>
+      <View style={styles.loadingRoot}>
+        <MutedText style={{ padding: 24, fontSize: 16 }}>Loading Mobile Operative Creator...</MutedText>
       </View>
     );
   }
 
-  const selectedAvatar = avatars[avatarIdx];
   const selectedClass = classes[classIdx];
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <NeonLabel color={COLORS.cyan}>{"// genesis_protocol_v1.0"}</NeonLabel>
-      <TitleText style={styles.title}>BUILD YOUR{"\n"}OPERATIVE</TitleText>
-
-      <CyberInput
-        testID="character-name-input"
-        label="Codename"
-        value={name}
-        onChangeText={setName}
-        placeholder="e.g. Cipher, Nyx, Glitch"
-        maxLength={24}
-      />
-
-      <NeonLabel color={COLORS.purple} style={{ marginTop: 4 }}>{"// select avatar"}</NeonLabel>
-      <View style={styles.avatarPreview}>
-        <View style={[styles.avatarBig, { borderColor: selectedAvatar.color, shadowColor: selectedAvatar.color }]}>
-          <Ionicons name={selectedAvatar.icon as any} size={72} color={selectedAvatar.color} />
+    <View style={styles.mobileRoot}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Header Title */}
+        <View style={styles.headerBlock}>
+          <NeonLabel color={COLORS.cyan}>{"// OPERATIVE_INITIALIZATION.BAT"}</NeonLabel>
+          <TitleText style={styles.headerTitle}>CREATE NEW OPERATIVE</TitleText>
+          <MutedText style={styles.headerSubtitle}>
+            Configure your stealth identity, avatar badge, and cyber combat specialization.
+          </MutedText>
         </View>
-        <MonoText style={{ color: selectedAvatar.color, marginTop: 8, fontSize: 12 }}>
-          {selectedAvatar.id.toUpperCase()}
-        </MonoText>
-      </View>
-      <FlatList
-        horizontal
-        data={avatars}
-        keyExtractor={(a) => a.id}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingVertical: 8 }}
-        renderItem={({ item, index }) => (
-          <Pressable
-            testID={`avatar-${item.id}`}
-            onPress={() => setAvatarIdx(index)}
-            style={[
-              styles.avatarPick,
-              {
-                borderColor: index === avatarIdx ? item.color : "rgba(255,255,255,0.05)",
-                shadowColor: index === avatarIdx ? item.color : "transparent",
-              },
-            ]}
-          >
-            <Ionicons name={item.icon as any} size={28} color={item.color} />
-          </Pressable>
-        )}
-      />
 
-      <NeonLabel color={COLORS.green} style={{ marginTop: 24 }}>{"// select cyber class"}</NeonLabel>
-      <View style={styles.classGrid}>
-        {classes.map((c, i) => (
-          <Pressable
-            key={c.id}
-            testID={`class-${c.id}`}
-            onPress={() => setClassIdx(i)}
-            style={[
-              styles.classCard,
-              {
-                borderColor: i === classIdx ? c.color : "rgba(255,255,255,0.08)",
-                shadowColor: i === classIdx ? c.color : "transparent",
-                backgroundColor: i === classIdx ? `${c.color}10` : COLORS.surface,
-              },
-            ]}
-          >
-            <Ionicons name={c.icon as any} size={28} color={c.color} />
-            <MonoText style={{ color: c.color, marginTop: 8, fontSize: 11, fontWeight: "700", textTransform: "uppercase" }}>
-              {c.name}
-            </MonoText>
-          </Pressable>
-        ))}
-      </View>
+        {/* Operative Callsign Input */}
+        <View style={styles.sectionCard}>
+          <CyberInput
+            testID="character-name-input"
+            label="OPERATIVE CALLSIGN"
+            value={name}
+            onChangeText={setName}
+            placeholder="e.g. VEX_ZERO, PHANTOM"
+            autoCapitalize="characters"
+          />
+        </View>
 
-      <View style={[styles.classDetail, { borderColor: selectedClass.color }]}>
-        <MonoText style={{ color: selectedClass.color, fontSize: 14, fontWeight: "700" }}>
-          {selectedClass.name.toUpperCase()}
-        </MonoText>
-        <MutedText style={{ marginTop: 8 }}>{selectedClass.description}</MutedText>
-        <MonoText style={{ color: COLORS.amber, marginTop: 10, fontSize: 11 }}>
-          ⚡ BONUS: {selectedClass.bonus}
-        </MonoText>
-        <View style={styles.statsGrid}>
-          {Object.entries(selectedClass.starting_stats).map(([k, v]) => (
-            <View key={k} style={styles.statRow}>
-              <MonoText style={{ color: COLORS.textMuted, fontSize: 10, textTransform: "uppercase" }}>{k.replace("_", " ")}</MonoText>
-              <View style={styles.statBarBg}>
-                <View style={[styles.statBarFill, { width: `${(v as number) * 10}%`, backgroundColor: selectedClass.color }]} />
+        {/* Avatar Carousel Selector */}
+        <View style={styles.sectionCard}>
+          <NeonLabel color={COLORS.purple}>SELECT AVATAR BADGE</NeonLabel>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.avatarCarousel}>
+            {avatars.map((av, idx) => {
+              const active = idx === avatarIdx;
+              return (
+                <TouchableOpacity
+                  key={av.id}
+                  testID={`avatar-option-${idx}`}
+                  onPress={() => setAvatarIdx(idx)}
+                  activeOpacity={0.7}
+                  style={[
+                    styles.avatarBadgeTile,
+                    { borderColor: active ? av.color : COLORS.border },
+                    active && { backgroundColor: "rgba(0, 240, 255, 0.1)", ...SHADOW_NATIVE(av.color) },
+                  ]}
+                >
+                  <Ionicons name={av.icon as any} size={32} color={av.color} />
+                  {active && <View style={[styles.activeDot, { backgroundColor: av.color }]} />}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Cyber Class Cards */}
+        <View style={styles.sectionCard}>
+          <NeonLabel color={COLORS.green}>CHOOSE SPECIALIZATION CLASS</NeonLabel>
+          <View style={styles.classGrid}>
+            {classes.map((cl, idx) => {
+              const active = idx === classIdx;
+              return (
+                <TouchableOpacity
+                  key={cl.id}
+                  testID={`class-option-${idx}`}
+                  onPress={() => setClassIdx(idx)}
+                  activeOpacity={0.7}
+                  style={[
+                    styles.classTile,
+                    { borderColor: active ? cl.color : COLORS.border },
+                    active && { backgroundColor: "rgba(0, 255, 102, 0.08)", ...SHADOW_NATIVE(cl.color) },
+                  ]}
+                >
+                  <View style={styles.classTileHeader}>
+                    <Ionicons name={cl.icon as any} size={22} color={cl.color} style={{ marginRight: 8 }} />
+                    <TitleText style={{ fontSize: 16, color: active ? cl.color : COLORS.textPrimary }}>
+                      {cl.name}
+                    </TitleText>
+                  </View>
+                  <MutedText style={styles.classTileDesc}>{cl.description}</MutedText>
+                  <View style={styles.bonusTag}>
+                    <MonoText style={{ color: COLORS.amber, fontSize: 11, fontWeight: "700" }}>
+                      ★ {cl.bonus}
+                    </MonoText>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Selected Class Stats Summary */}
+        <View style={[styles.sectionCard, { borderColor: selectedClass.color }]}>
+          <NeonLabel color={selectedClass.color}>{selectedClass.name.toUpperCase()} BASE STATS</NeonLabel>
+          <View style={styles.statsRow}>
+            {Object.entries(selectedClass.starting_stats).map(([k, v]) => (
+              <View key={k} style={styles.statBox}>
+                <MonoText style={{ color: COLORS.textMuted, fontSize: 10, textTransform: "uppercase" }}>{k}</MonoText>
+                <TitleText style={{ color: selectedClass.color, fontSize: 18, marginTop: 2 }}>{v}</TitleText>
               </View>
-              <MonoText style={{ color: selectedClass.color, fontSize: 10, width: 24 }}>{v}</MonoText>
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
-      </View>
 
-      {err ? <MonoText style={{ color: COLORS.red, marginTop: 10, fontSize: 12 }}>{err}</MonoText> : null}
+        {err ? (
+          <View style={styles.errorBox}>
+            <Ionicons name="alert-circle" size={16} color={COLORS.red} style={{ marginRight: 6 }} />
+            <MonoText style={{ color: COLORS.red, fontSize: 12 }}>{err}</MonoText>
+          </View>
+        ) : null}
 
-      <NeonButton
-        testID="create-character-button"
-        label="Initialize Operative"
-        onPress={create}
-        loading={loading}
-        color={selectedClass.color}
-        variant="solid"
-      />
-    </ScrollView>
+        {/* Floating Bottom CTA */}
+        <View style={{ marginTop: 24, marginBottom: 40 }}>
+          <NeonButton
+            testID="create-character-submit"
+            label={loading ? "INITIALIZING..." : "INITIALIZE OPERATIVE"}
+            onPress={create}
+            color={COLORS.cyan}
+            variant="solid"
+            disabled={loading}
+          />
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.bg },
-  scroll: { padding: 20, paddingTop: 60, paddingBottom: 60 },
-  title: { fontSize: 30, color: COLORS.cyan, lineHeight: 34, marginBottom: 24, letterSpacing: 2, fontFamily: FONT.heading, fontWeight: "900" },
-  avatarPreview: { alignItems: "center", marginVertical: 12 },
-  avatarBig: {
-    width: 130, height: 130, borderWidth: 2, alignItems: "center", justifyContent: "center",
-    backgroundColor: COLORS.surface, shadowOpacity: 0.6, shadowRadius: 18,
+  loadingRoot: { flex: 1, backgroundColor: COLORS.bg, justifyContent: "center", alignItems: "center" },
+  mobileRoot: { flex: 1, backgroundColor: COLORS.bg },
+  scrollContent: { padding: 20, paddingTop: Platform.OS === "ios" ? 54 : 36 },
+
+  headerBlock: { marginBottom: 20 },
+  headerTitle: { fontSize: 28, fontWeight: "900", color: COLORS.textPrimary, letterSpacing: 2, marginTop: 4 },
+  headerSubtitle: { fontSize: 13, color: COLORS.textSecondary, marginTop: 6, lineHeight: 18 },
+
+  sectionCard: {
+    backgroundColor: COLORS.surfaceGlass, borderRadius: RADII.lg, padding: 18,
+    borderWidth: 1, borderColor: COLORS.border, marginBottom: 16, ...SHADOW_NATIVE(COLORS.cyanGlow),
   },
-  avatarPick: {
-    width: 56, height: 56, borderWidth: 1.5, marginRight: 10,
-    alignItems: "center", justifyContent: "center", backgroundColor: COLORS.surface,
-    shadowOpacity: 0.5, shadowRadius: 8,
+
+  avatarCarousel: { gap: 12, paddingVertical: 10 },
+  avatarBadgeTile: {
+    width: 64, height: 64, borderRadius: RADII.md, backgroundColor: COLORS.surfaceElevated,
+    borderWidth: 1.5, justifyContent: "center", alignItems: "center", position: "relative",
   },
-  classGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginVertical: 12 },
-  classCard: {
-    width: "31%", padding: 12, borderWidth: 1.5, alignItems: "center",
-    shadowOpacity: 0.5, shadowRadius: 10, minHeight: 92,
+  activeDot: { position: "absolute", bottom: 4, width: 6, height: 6, borderRadius: 3 },
+
+  classGrid: { gap: 12, marginTop: 12 },
+  classTile: {
+    backgroundColor: COLORS.surfaceElevated, borderRadius: RADII.md, padding: 14,
+    borderWidth: 1.5,
   },
-  classDetail: { padding: 16, borderWidth: 1, marginVertical: 16, backgroundColor: COLORS.surface },
-  statsGrid: { marginTop: 14 },
-  statRow: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
-  statBarBg: { flex: 1, height: 6, backgroundColor: COLORS.surfaceElevated, marginHorizontal: 8 },
-  statBarFill: { height: 6 },
+  classTileHeader: { flexDirection: "row", alignItems: "center" },
+  classTileDesc: { fontSize: 12, color: COLORS.textSecondary, marginTop: 6, lineHeight: 16 },
+  bonusTag: { marginTop: 8, alignSelf: "flex-start", backgroundColor: "rgba(245, 158, 11, 0.1)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADII.pill },
+
+  statsRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 10 },
+  statBox: { alignItems: "center", flex: 1 },
+
+  errorBox: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(239, 68, 68, 0.12)", padding: 12, borderRadius: RADII.md, borderWidth: 1, borderColor: COLORS.red, marginBottom: 16 },
 });
