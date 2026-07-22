@@ -56,7 +56,8 @@ security = HTTPBearer(auto_error=False)
 @api.get("/")
 @api.get("/health")
 async def health_check():
-    return {"status": "ok", "app": "Shadow Nexus API"}
+    return {"status": "online", "app": "Shadow Nexus", "version": "1.0.0"}
+
 
 
 import smtplib
