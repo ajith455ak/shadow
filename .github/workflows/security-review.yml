@@ -39,6 +39,7 @@ jobs:
         with:
           name: gitleaks-report
           path: gitleaks.json
+          if-no-files-found: ignore
 
   sast-semgrep:
     name: SAST - Semgrep
@@ -47,6 +48,10 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
       - name: Run Semgrep
         run: |
           pip install semgrep
@@ -56,6 +61,7 @@ jobs:
         with:
           name: semgrep-report
           path: semgrep.json
+          if-no-files-found: ignore
 
   dependency-scan:
     name: Dependency Vulnerability Scan
@@ -64,6 +70,10 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
       - name: Run Dependency Audits
         run: |
           # Python safety scan
@@ -88,6 +98,7 @@ jobs:
           path: |
             safety.json
             npm_audit.json
+          if-no-files-found: ignore
 
   generate-reports:
     name: Generate Security Reports
@@ -122,3 +133,4 @@ jobs:
       - name: Run Summary Generator
         run: |
           python backend/generate_security_summary.py
+
