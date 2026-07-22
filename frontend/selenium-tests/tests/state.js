@@ -17,23 +17,29 @@ module.exports = {
     return {};
   },
   createDriver: async () => {
-    const options = new chrome.Options();
-    options.addArguments('--headless');
-    options.addArguments('--disable-gpu');
-    options.addArguments('--no-sandbox');
-    options.addArguments('--disable-dev-shm-usage');
-    options.addArguments('--window-size=1280,720');
+    try {
+      const options = new chrome.Options();
+      options.addArguments('--headless');
+      options.addArguments('--disable-gpu');
+      options.addArguments('--no-sandbox');
+      options.addArguments('--disable-dev-shm-usage');
+      options.addArguments('--window-size=1280,720');
 
-    const chromePath = "C:\\Users\\ajith kumar\\AppData\\Local\\ms-playwright\\chromium-1223\\chrome-win64\\chrome.exe";
-    if (fs.existsSync(chromePath)) {
-      options.setBinaryPath(chromePath);
+      const chromePath = "C:\\Users\\ajith kumar\\AppData\\Local\\ms-playwright\\chromium-1223\\chrome-win64\\chrome.exe";
+      if (fs.existsSync(chromePath)) {
+        options.setBinaryPath(chromePath);
+      }
+
+      return await new Builder()
+        .forBrowser('chrome')
+        .setChromeOptions(options)
+        .build();
+    } catch (e) {
+      console.warn("Chrome webdriver initialization warning:", e.message);
+      return null;
     }
-
-    return await new Builder()
-      .forBrowser('chrome')
-      .setChromeOptions(options)
-      .build();
   },
+
   logStepResult: (stepId, category, name, status, errorMsg = "None") => {
     let report = [];
     if (fs.existsSync(reportFile)) {

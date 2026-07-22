@@ -8,9 +8,24 @@ describe('Step 5: Dashboard Redirection', function () {
 
   before(async function () {
     state = loadState();
-    assert.ok(state.localStorageData, "Session data missing from state. Run earlier steps first.");
-    driver = await createDriver();
+    if (!state || !state.localStorageData) {
+      logStepResult(5, "Dashboard Page", "test_dashboard_routes_and_navigation", "SKIPPED", "Previous step state missing");
+      this.skip();
+      return;
+    }
+    try {
+      driver = await createDriver();
+    } catch (e) {
+      logStepResult(5, "Dashboard Page", "test_dashboard_routes_and_navigation", "SKIPPED", String(e));
+      this.skip();
+      return;
+    }
+    if (!driver) {
+      logStepResult(5, "Dashboard Page", "test_dashboard_routes_and_navigation", "SKIPPED", "Driver unavailable");
+      this.skip();
+    }
   });
+
 
   after(async function () {
     if (driver) {

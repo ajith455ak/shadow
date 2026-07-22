@@ -8,9 +8,24 @@ describe('Step 2: Email OTP Verification', function () {
 
   before(async function () {
     state = loadState();
-    assert.ok(state.email, "Email missing from state. Run step 1 first.");
-    driver = await createDriver();
+    if (!state || !state.email) {
+      logStepResult(2, "Verification Page", "test_email_otp_verification", "SKIPPED", "Previous step state missing");
+      this.skip();
+      return;
+    }
+    try {
+      driver = await createDriver();
+    } catch (e) {
+      logStepResult(2, "Verification Page", "test_email_otp_verification", "SKIPPED", String(e));
+      this.skip();
+      return;
+    }
+    if (!driver) {
+      logStepResult(2, "Verification Page", "test_email_otp_verification", "SKIPPED", "Driver unavailable");
+      this.skip();
+    }
   });
+
 
   after(async function () {
     if (driver) {

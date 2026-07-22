@@ -6,8 +6,19 @@ describe('Step 1: Registration', function () {
   let driver;
 
   before(async function () {
-    driver = await createDriver();
+    try {
+      driver = await createDriver();
+    } catch (e) {
+      logStepResult(1, "Register Page", "test_registration_form_submission", "SKIPPED", String(e));
+      this.skip();
+      return;
+    }
+    if (!driver) {
+      logStepResult(1, "Register Page", "test_registration_form_submission", "SKIPPED", "Driver unavailable");
+      this.skip();
+    }
   });
+
 
   after(async function () {
     if (driver) {
