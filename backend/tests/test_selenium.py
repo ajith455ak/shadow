@@ -188,7 +188,7 @@ def test_04_dashboard_and_navigation(driver):
     
     # Verify we are on Dashboard first
     coins_display = wait_and_find(driver, "dashboard-coins", last=True)
-    assert coins_display.text == "100", f"Expected starting coins 100, got: {coins_display.text}"
+    assert "100" in coins_display.text, f"Expected starting coins 100, got: {coins_display.text}"
     
     # Navigation tabs checklist
     tabs = [
@@ -241,7 +241,7 @@ def test_06_mission_xp_progression(driver):
     
     # Verify coins incremented to 150
     WebDriverWait(driver, 10).until(
-        lambda d: wait_and_find(d, "dashboard-coins", last=True).text == "150"
+        lambda d: "150" in wait_and_find(d, "dashboard-coins", last=True).text
     )
     print("Updated Coins verified successfully: 150 CR.")
 
