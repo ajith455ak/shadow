@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-api_key = os.getenv("RENDER_API_KEY", "")
-service_id = os.getenv("RENDER_SERVICE_ID", "")
+api_key = os.getenv("RENDER_API_KEY", "").strip() or "rnd_oChEZnH4KJPJk6sILMVt4HfvnENq"
+service_id = os.getenv("RENDER_SERVICE_ID", "").strip() or "srv-d8mecb67r5hc739mkn10"
 
 headers = {
     "Authorization": f"Bearer {api_key}",
@@ -26,7 +26,8 @@ try:
         data = json.loads(response.read().decode())
         print("Recent Deploys:")
         for deploy in data:
-            d = deploy["deploy"]
-            print(f"- ID: {d['id']}, Status: {d['status']}, Trigger: {d['trigger']}, Created: {d['createdAt']}")
+            d = deploy.get("deploy", deploy) if isinstance(deploy, dict) else {}
+            print(f"- ID: {d.get('id')}, Status: {d.get('status')}, Trigger: {d.get('trigger')}, Created: {d.get('createdAt')}")
 except Exception as e:
     print(f"Error fetching deploys: {e}")
+

@@ -5,8 +5,8 @@ import time
 import sys
 import os
 
-api_key = "rnd_oChEZnH4KJPJk6sILMVt4HfvnENq"
-service_id = "srv-d8mecb67r5hc739mkn10"
+api_key = os.getenv("RENDER_API_KEY", "").strip() or "rnd_oChEZnH4KJPJk6sILMVt4HfvnENq"
+service_id = os.getenv("RENDER_SERVICE_ID", "").strip() or "srv-d8mecb67r5hc739mkn10"
 
 # Read deploy_id from command line or environment
 if len(sys.argv) > 1:
@@ -56,21 +56,36 @@ ctx.verify_mode = ssl.CERT_NONE
 
 print(f"Waiting for deploy {deploy_id} to complete...")
 
-while True:
+max_attempts = 60
+attempt = 0
+
+while attempt < max_attempts:
+    attempt += 1
     try:
         with urllib.request.urlopen(req, context=ctx) as response:
             data = json.loads(response.read().decode())
-            status = data["status"]
-            print(f"Current deploy status: {status}")
-            if status == "live":
-                print("Deploy succeeded!")
-                write_summary(status, True)
-                sys.exit(0)
-            elif status in ("build_failed", "update_failed", "canceled"):
-                print(f"Deploy failed with status: {status}")
-                write_summary(status, False)
-                sys.exit(1)
+            status = None
+            if isinstance(data, dict):
+                status = data.get("status") or data.get("deploy", {}).get("status")
+
+            if status:
+                print(f"[{attempt}/{max_attempts}] Current deploy status: {status}")
+                if status == "live":
+                    print("Deploy succeeded!")
+                    write_summary(status, True)
+                    sys.exit(0)
+                elif status in ("build_failed", "update_failed", "canceled", "deactivated"):
+                    print(f"Deploy failed/deactivated with status: {status}")
+                    write_summary(status, False)
+                    sys.exit(1)
+            else:
+                print(f"[{attempt}/{max_attempts}] Deploy status unreadable from payload")
     except Exception as e:
-        print(f"Error checking deploy status: {e}", file=sys.stderr)
+        print(f"[{attempt}/{max_attempts}] Error checking deploy status: {e}", file=sys.stderr)
     
     time.sleep(15)
+
+print(f"Error: Deployment timed out after {max_attempts} attempts.", file=sys.stderr)
+write_summary("timeout", False)
+sys.exit(1)
+

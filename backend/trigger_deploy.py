@@ -2,9 +2,10 @@ import urllib.request
 import json
 import ssl
 import sys
+import os
 
-api_key = "rnd_oChEZnH4KJPJk6sILMVt4HfvnENq"
-service_id = "srv-d8mecb67r5hc739mkn10"
+api_key = os.getenv("RENDER_API_KEY", "").strip() or "rnd_oChEZnH4KJPJk6sILMVt4HfvnENq"
+service_id = os.getenv("RENDER_SERVICE_ID", "").strip() or "srv-d8mecb67r5hc739mkn10"
 
 headers = {
     "Authorization": f"Bearer {api_key}",
@@ -21,8 +22,10 @@ def get_latest_deploy_id():
     try:
         with urllib.request.urlopen(req, context=ctx) as response:
             data = json.loads(response.read().decode())
-            if data:
-                return data[0]["deploy"]["id"]
+            if isinstance(data, list) and len(data) > 0:
+                d = data[0]
+                if isinstance(d, dict):
+                    return d.get("id") or d.get("deploy", {}).get("id")
     except Exception as e:
         print(f"Error fetching latest deploy ID: {e}", file=sys.stderr)
     return None
@@ -47,16 +50,19 @@ try:
         except json.JSONDecodeError:
             data = {}
             
-        if not data or "id" not in data:
+        deploy_id = None
+        if isinstance(data, dict):
+            deploy_id = data.get("id") or data.get("deploy", {}).get("id")
+
+        if not deploy_id:
             deploy_id = get_latest_deploy_id()
-            if deploy_id:
-                print(json.dumps({"id": deploy_id, "status": "no_content_fallback"}, indent=2))
-                sys.exit(0)
-            else:
-                print(f"Error: Invalid response body '{raw_body}' and failed to fetch latest deploy ID", file=sys.stderr)
-                sys.exit(1)
-                
-        print(json.dumps(data, indent=2))
+
+        if deploy_id:
+            print(json.dumps({"id": deploy_id, "status": data.get("status", "triggered")}, indent=2))
+            sys.exit(0)
+        else:
+            print(f"Error: Invalid response body '{raw_body}' and failed to fetch latest deploy ID", file=sys.stderr)
+            sys.exit(1)
 except Exception as e:
     # 400/409 represents conflict when deploy is already in progress
     is_conflict = False
@@ -73,5 +79,9 @@ except Exception as e:
             
     print(f"Error triggering deploy: {e}", file=sys.stderr)
     if hasattr(e, 'read'):
-        print(e.read().decode(), file=sys.stderr)
+        try:
+            print(e.read().decode(), file=sys.stderr)
+        except Exception:
+            pass
     sys.exit(1)
+

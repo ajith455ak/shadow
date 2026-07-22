@@ -33,9 +33,9 @@ from seed_data import (
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
-MONGO_URL = os.environ["MONGO_URL"]
-DB_NAME = os.environ["DB_NAME"]
-JWT_SECRET = os.environ["JWT_SECRET"]
+MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
+DB_NAME = os.environ.get("DB_NAME", "shadow_nexus")
+JWT_SECRET = os.environ.get("JWT_SECRET", "testsecretkey123")
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 ENABLE_DEMO_TOKENS = os.environ.get("ENABLE_DEMO_TOKENS", "false").lower() == "true"
 
@@ -49,6 +49,15 @@ db = client[DB_NAME]
 app = FastAPI(title="Shadow Nexus API")
 api = APIRouter(prefix="/api")
 security = HTTPBearer(auto_error=False)
+
+@app.get("/")
+@app.get("/api")
+@app.get("/api/")
+@api.get("/")
+@api.get("/health")
+async def health_check():
+    return {"status": "ok", "app": "Shadow Nexus API"}
+
 
 import smtplib
 from email.mime.text import MIMEText
