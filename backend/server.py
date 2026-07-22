@@ -29,6 +29,7 @@ from seed_data import (
     NPCS,
     SKILLS,
 )
+from push_service import build_push_message, send_expo_push_notifications
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -204,6 +205,16 @@ class SkillUnlockIn(BaseModel):
 
 class ItemUseIn(BaseModel):
     item_id: str
+
+
+class PushRegisterIn(BaseModel):
+    expo_push_token: str
+    device_name: Optional[str] = "Unknown Device"
+    platform: Optional[str] = "mobile"
+
+
+class PushUnregisterIn(BaseModel):
+    expo_push_token: str
 
 
 # ---------- Helpers ----------
@@ -1331,6 +1342,65 @@ async def messenger_seed(user=Depends(get_current_user)):
                        text="Remember — the network teaches what books cannot. Trace every packet like a breadcrumb home.",
                        priority="info")
     return {"success": True}
+
+
+# ---------- Push Notifications ----------
+@api.post("/push/register")
+async def push_register(payload: PushRegisterIn, user=Depends(get_current_user)):
+    now_iso = utcnow().isoformat()
+    await db.push_tokens.update_one(
+        {"user_id": user["id"], "expo_push_token": payload.expo_push_token},
+        {
+            "$set": {
+                "user_id": user["id"],
+                "expo_push_token": payload.expo_push_token,
+                "device_name": payload.device_name,
+                "platform": payload.platform,
+                "last_seen": now_iso,
+            },
+            "$setOnInsert": {
+                "created_at": now_iso,
+            },
+        },
+        upsert=True,
+    )
+    return {"success": True, "message": "Push token registered successfully"}
+
+
+@api.post("/push/unregister")
+async def push_unregister(payload: PushUnregisterIn, user=Depends(get_current_user)):
+    res = await db.push_tokens.delete_one({"user_id": user["id"], "expo_push_token": payload.expo_push_token})
+    return {"success": True, "deleted_count": res.deleted_count}
+
+
+@api.get("/push/me")
+async def push_me(user=Depends(get_current_user)):
+    tokens = await db.push_tokens.find({"user_id": user["id"]}, {"_id": 0}).to_list(20)
+    return {"tokens": tokens}
+
+
+@api.post("/push/test")
+async def push_test(user=Depends(get_current_user), background_tasks: BackgroundTasks = None):
+    tokens_docs = await db.push_tokens.find({"user_id": user["id"]}, {"_id": 0}).to_list(10)
+    if not tokens_docs:
+        raise HTTPException(status_code=400, detail="No registered push tokens found for user")
+    
+    char = await db.characters.find_one({"user_id": user["id"]}, {"_id": 0})
+    name = char["name"] if char else user["username"]
+    
+    messages = [
+        build_push_message(
+            token=doc["expo_push_token"],
+            title="⚡ Shadow Nexus Tactical Alert",
+            body=f"Agent {name}, your stealth link is active. Node breach verified.",
+            data={"type": "test_alert", "timestamp": utcnow().isoformat()},
+        )
+        for doc in tokens_docs
+    ]
+    
+    result = await send_expo_push_notifications(messages)
+    return {"success": True, "dispatch_result": result}
+
 
 
 # ---------- NPC Trust / Persuasion ----------
