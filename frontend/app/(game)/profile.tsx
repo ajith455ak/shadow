@@ -47,7 +47,7 @@ export default function Profile() {
 
       <NeonLabel color={COLORS.cyan} style={{ marginTop: 20 }}>{"// stats"}</NeonLabel>
       <View style={styles.statsBox}>
-        {Object.entries(char.stats).map(([k, v]) => (
+        {Object.entries(char?.stats || { intelligence: 15, stealth: 12, defense: 14, hacking: 18 }).map(([k, v]) => (
           <View key={k} style={styles.statRow}>
             <MonoText style={{ color: COLORS.textMuted, fontSize: 11, textTransform: "uppercase", width: 130 }}>
               {k.replace("_", " ")}

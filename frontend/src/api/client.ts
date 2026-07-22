@@ -37,7 +37,7 @@ const TOKEN_KEY = "sn_token";
 
 export async function getToken(): Promise<string | null> {
   const token = await storage.secureGet<string>(TOKEN_KEY, "");
-  return token || "guest_demo_token_123";
+  return token || null;
 }
 
 export async function setToken(token: string): Promise<void> {
