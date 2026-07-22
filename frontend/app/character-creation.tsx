@@ -4,7 +4,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS, FONT, RADII, SHADOW_NATIVE } from "@/src/theme";
+import { COLORS, FONT, RADII, SHADOW_NATIVE, SHADOW_NEON } from "@/src/theme";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { NeonButton } from "@/src/components/NeonButton";
@@ -108,7 +108,7 @@ export default function CharacterCreation() {
                   style={[
                     styles.avatarBadgeTile,
                     { borderColor: active ? av.color : COLORS.border },
-                    active && { backgroundColor: "rgba(0, 240, 255, 0.1)", ...SHADOW_NATIVE(av.color) },
+                    active && { backgroundColor: "rgba(0, 240, 255, 0.1)", ...SHADOW_NEON(av.color) },
                   ]}
                 >
                   <Ionicons name={av.icon as any} size={32} color={av.color} />
@@ -134,7 +134,7 @@ export default function CharacterCreation() {
                   style={[
                     styles.classTile,
                     { borderColor: active ? cl.color : COLORS.border },
-                    active && { backgroundColor: "rgba(0, 255, 102, 0.08)", ...SHADOW_NATIVE(cl.color) },
+                    active && { backgroundColor: "rgba(0, 255, 102, 0.08)", ...SHADOW_NEON(cl.color) },
                   ]}
                 >
                   <View style={styles.classTileHeader}>
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
 
   sectionCard: {
     backgroundColor: COLORS.surfaceGlass, borderRadius: RADII.lg, padding: 18,
-    borderWidth: 1, borderColor: COLORS.border, marginBottom: 16, ...SHADOW_NATIVE(COLORS.cyanGlow),
+    borderWidth: 1, borderColor: COLORS.border, marginBottom: 16, ...SHADOW_NEON(COLORS.cyanGlow),
   },
 
   avatarCarousel: { gap: 12, paddingVertical: 10 },

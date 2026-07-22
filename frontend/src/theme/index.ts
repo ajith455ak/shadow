@@ -37,6 +37,14 @@ export const SHADOW_NATIVE = {
   elevation: 5,
 };
 
+export const SHADOW_NEON = (color: string) => ({
+  shadowColor: color,
+  shadowOpacity: 0.5,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 0 },
+  elevation: 6,
+});
+
 const SANS = Platform.select({ ios: "System", android: "sans-serif-medium", default: "sans-serif" });
 
 export const FONT = {

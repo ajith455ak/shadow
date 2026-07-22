@@ -5,7 +5,7 @@ import {
 } from "react-native";
 import { useRouter, Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS, FONT, RADII, SHADOW_NATIVE } from "@/src/theme";
+import { COLORS, FONT, RADII, SHADOW_NATIVE, SHADOW_NEON } from "@/src/theme";
 import { useAuth } from "@/src/context/AuthContext";
 import { CyberInput } from "@/src/components/CyberInput";
 import { NeonButton } from "@/src/components/NeonButton";
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   fingerprintBadge: {
     width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(0, 240, 255, 0.1)",
     borderWidth: 1.5, borderColor: COLORS.cyan, justifyContent: "center", alignItems: "center",
-    ...SHADOW_NATIVE(COLORS.cyan),
+    ...SHADOW_NEON(COLORS.cyan),
   },
 
   brandContainer: { marginBottom: 28 },
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
 
   mobileFormCard: {
     backgroundColor: COLORS.surfaceGlass, borderRadius: RADII.lg, padding: 24,
-    borderWidth: 1, borderColor: COLORS.border, ...SHADOW_NATIVE(COLORS.cyanGlow),
+    borderWidth: 1, borderColor: COLORS.border, ...SHADOW_NEON(COLORS.cyanGlow),
   },
 
   eyeBtn: { position: "absolute", right: 12, top: 38, padding: 8 },

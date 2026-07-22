@@ -5,7 +5,7 @@ import {
 } from "react-native";
 import { Link, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS, FONT, RADII, SHADOW_NATIVE } from "@/src/theme";
+import { COLORS, FONT, RADII, SHADOW_NATIVE, SHADOW_NEON } from "@/src/theme";
 import { useAuth } from "@/src/context/AuthContext";
 import { CyberInput } from "@/src/components/CyberInput";
 import { NeonButton } from "@/src/components/NeonButton";
@@ -196,14 +196,14 @@ const styles = StyleSheet.create({
   badgeIconBox: {
     width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(168, 85, 247, 0.12)",
     borderWidth: 1.5, borderColor: COLORS.purple, justifyContent: "center", alignItems: "center",
-    ...SHADOW_NATIVE(COLORS.purple),
+    ...SHADOW_NEON(COLORS.purple),
   },
   headerTitle: { fontSize: 28, fontWeight: "900", color: COLORS.textPrimary, letterSpacing: 2 },
   headerSubtitle: { fontSize: 13, color: COLORS.textSecondary, marginTop: 4, lineHeight: 18 },
 
   formCard: {
     backgroundColor: COLORS.surfaceGlass, borderRadius: RADII.lg, padding: 20,
-    borderWidth: 1, borderColor: COLORS.border, ...SHADOW_NATIVE(COLORS.purpleGlow),
+    borderWidth: 1, borderColor: COLORS.border, ...SHADOW_NEON(COLORS.purpleGlow),
   },
 
   eyeBtn: { position: "absolute", right: 12, top: 38, padding: 8 },
