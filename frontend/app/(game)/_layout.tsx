@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
+import { Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS, FONT } from "@/src/theme";
+import { COLORS, FONT, SHADOW_NEON } from "@/src/theme";
 
 export default function GameLayout() {
   return (
@@ -8,23 +9,36 @@ export default function GameLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: COLORS.surface,
-          borderTopColor: "rgba(0,240,255,0.2)",
-          borderTopWidth: 1,
+          backgroundColor: COLORS.bottomBarBg,
+          borderTopColor: COLORS.border,
+          borderWidth: 1.5,
+          borderColor: "rgba(0, 240, 255, 0.25)",
+          position: "absolute",
+          bottom: Platform.OS === "ios" ? 20 : 12,
+          left: 16,
+          right: 16,
+          borderRadius: 28,
           height: 64,
-          paddingBottom: 8,
+          paddingBottom: Platform.OS === "ios" ? 10 : 8,
           paddingTop: 8,
+          elevation: 12,
+          shadowColor: COLORS.cyan,
+          shadowOpacity: 0.35,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: 6 },
         },
         tabBarActiveTintColor: COLORS.cyan,
         tabBarInactiveTintColor: COLORS.textMuted,
-        tabBarLabelStyle: { fontFamily: FONT.bodyBold, fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase" },
+        tabBarLabelStyle: { fontFamily: FONT.bodyBold, fontSize: 10, letterSpacing: 1.2, fontWeight: "700" },
       }}
     >
       <Tabs.Screen
         name="dashboard"
         options={{
           title: "HQ",
-          tabBarIcon: ({ color, size }) => <Ionicons name="grid" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "grid" : "grid-outline"} size={focused ? 24 : size} color={color} />
+          ),
           tabBarTestID: "tab-dashboard",
         }}
       />
@@ -32,7 +46,9 @@ export default function GameLayout() {
         name="story"
         options={{
           title: "Story",
-          tabBarIcon: ({ color, size }) => <Ionicons name="git-network" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "git-network" : "git-network-outline"} size={focused ? 24 : size} color={color} />
+          ),
           tabBarTestID: "tab-story",
         }}
       />
@@ -40,7 +56,9 @@ export default function GameLayout() {
         name="npcs"
         options={{
           title: "NPCs",
-          tabBarIcon: ({ color, size }) => <Ionicons name="people" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "people" : "people-outline"} size={focused ? 24 : size} color={color} />
+          ),
           tabBarTestID: "tab-npcs",
         }}
       />
@@ -48,7 +66,9 @@ export default function GameLayout() {
         name="inventory"
         options={{
           title: "Gear",
-          tabBarIcon: ({ color, size }) => <Ionicons name="cube" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "cube" : "cube-outline"} size={focused ? 24 : size} color={color} />
+          ),
           tabBarTestID: "tab-inventory",
         }}
       />
@@ -56,7 +76,9 @@ export default function GameLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, size }) => <Ionicons name="person-circle" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "person-circle" : "person-circle-outline"} size={focused ? 24 : size} color={color} />
+          ),
           tabBarTestID: "tab-profile",
         }}
       />
