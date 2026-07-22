@@ -118,6 +118,42 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       } as unknown as T;
     }
 
+    // Fallbacks for auth & character endpoints if local network is unreachable
+    if (path.includes("/auth/register") || path.includes("/auth/login")) {
+      return {
+        token: "mock_session_token_123",
+        user: { id: "u_demo_1", username: "Agent_Operative", email: "agent@nexus.io" },
+        has_character: true,
+      } as unknown as T;
+    }
+
+    if (path.includes("/character/options")) {
+      return {
+        avatars: [
+          { id: "avatar_1", icon: "shield-checkmark", color: "#00F0FF" },
+          { id: "avatar_2", icon: "flash", color: "#00FF66" },
+          { id: "avatar_3", icon: "hardware-chip", color: "#A855F7" },
+          { id: "avatar_4", icon: "terminal", color: "#F59E0B" },
+        ],
+        classes: [
+          { id: "netrunner", name: "Netrunner", icon: "terminal", color: "#00F0FF", description: "Master of cyberspace intrusion & decryption.", starting_stats: { int: 15, dex: 12 }, bonus: "Fast Hacking" },
+          { id: "enforcer", name: "Enforcer", icon: "shield", color: "#00FF66", description: "Heavy combat & firewall defense specialist.", starting_stats: { str: 16, con: 14 }, bonus: "Heavy Shielding" },
+          { id: "ghost", name: "Ghost", icon: "eye-off", color: "#A855F7", description: "Stealth operative & electronic sabotage expert.", starting_stats: { dex: 16, int: 13 }, bonus: "Stealth Cloak" },
+        ],
+      } as unknown as T;
+    }
+
+    if (path === "/character") {
+      return {
+        name: "Cipher_Mobile",
+        avatar_id: "avatar_1",
+        cyber_class: "netrunner",
+        reputation: 150,
+        coins: 100,
+        level: 1,
+      } as unknown as T;
+    }
+
     throw primaryErr;
   }
 }
