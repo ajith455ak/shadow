@@ -674,19 +674,34 @@ async def get_character(user=Depends(get_current_user)):
 async def dashboard(user=Depends(get_current_user)):
     char = await db.characters.find_one({"user_id": user["id"]}, {"_id": 0})
     if not char:
-        raise HTTPException(status_code=404, detail="No character")
+        char = {
+            "user_id": user["id"],
+            "name": user.get("username", "Agent_Operative"),
+            "avatar_id": "avatar_1",
+            "cyber_class": "netrunner",
+            "level": 1,
+            "total_xp": 0,
+            "reputation": 100,
+            "coins": 250,
+            "current_chapter": "ch1",
+            "completed_missions": [],
+            "stats_counters": {"missions": 0, "boss_kills": 0, "npc_chats": 0},
+            "inventory": ["nmap_basic", "cyber_armor"],
+            "equipment": {"body": "cyber_armor", "tool": "nmap_basic"},
+        }
+        await db.characters.insert_one(char.copy())
+
     next_lvl_xp = total_xp_for_level(char["level"] + 1)
     current_lvl_xp = total_xp_for_level(char["level"])
-    progress = (char["total_xp"] - current_lvl_xp) / max(1, (next_lvl_xp - current_lvl_xp))
-    # current mission = first uncompleted in current chapter
-    chapter_missions = [m for m in MISSIONS if m["chapter_id"] == char["current_chapter"]]
-    current_mission = next((m for m in chapter_missions if m["id"] not in char["completed_missions"]), None)
+    progress = (char.get("total_xp", 0) - current_lvl_xp) / max(1, (next_lvl_xp - current_lvl_xp))
+    chapter_missions = [m for m in MISSIONS if m["chapter_id"] == char.get("current_chapter", "ch1")]
+    current_mission = next((m for m in chapter_missions if m["id"] not in char.get("completed_missions", [])), chapter_missions[0] if chapter_missions else None)
     challenges = todays_challenges(user["id"])
     challenge_progress = char.get("daily_progress", {}).get(utcnow().date().isoformat(), {})
     return {
         "character": _serialize_character(char),
         "xp_progress": round(progress, 4),
-        "xp_to_next_level": max(0, next_lvl_xp - char["total_xp"]),
+        "xp_to_next_level": max(0, next_lvl_xp - char.get("total_xp", 0)),
         "current_mission": current_mission,
         "daily_challenges": [
             {**c, "progress": challenge_progress.get(c["id"], 0), "completed": challenge_progress.get(f"{c['id']}_done", False)}
@@ -1370,6 +1385,115 @@ async def messenger_inbox(user=Depends(get_current_user)):
 async def messenger_read(user=Depends(get_current_user)):
     await db.messages.update_many({"user_id": user["id"], "read": False}, {"$set": {"read": True}})
     return {"success": True}
+
+
+# ---------- Dashboard Engine ----------
+@api.get("/dashboard")
+async def get_dashboard(user=Depends(get_current_user)):
+    char = await db.characters.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not char:
+        char = {
+            "user_id": user["id"],
+            "name": user.get("username", "Operative"),
+            "avatar_id": "avatar_1",
+            "cyber_class": "netrunner",
+            "level": 1,
+            "xp": 150,
+            "coins": 250,
+            "reputation": 100,
+            "inventory": [],
+            "equipment": {"head": "quantum_helmet", "body": "cyber_armor", "tool": "nmap_basic"},
+        }
+        await db.characters.insert_one(char.copy())
+
+    level = char.get("level", 1)
+    xp = char.get("xp", 0)
+    xp_to_next = level * 500
+    xp_progress = min(1.0, xp / xp_to_next)
+
+    cursor = db.missions.find({"accepted_by": user["id"], "status": "active"}, {"_id": 0})
+    active_missions = await cursor.to_list(length=1)
+    cur_mission = active_missions[0] if active_missions else {
+        "id": "m1",
+        "title": "Helios Gateway Breach",
+        "story": "Establish a secure breach in the corporate perimeter node.",
+        "difficulty": "Easy",
+        "rewards": {"xp": 150, "coins": 250},
+    }
+
+    cursor = db.daily_challenges.find({}, {"_id": 0})
+    dailies = await cursor.to_list(length=5)
+
+    return {
+        "character": char,
+        "xp_progress": xp_progress,
+        "xp_to_next_level": max(0, xp_to_next - xp),
+        "current_mission": cur_mission,
+        "daily_challenges": dailies,
+    }
+
+
+# ---------- Inventory Engine ----------
+@api.get("/inventory")
+async def get_inventory(user=Depends(get_current_user)):
+    char = await db.characters.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not char:
+        raise HTTPException(status_code=404, detail="No character found")
+    
+    items = char.get("inventory", [])
+    if not items:
+        items = [
+            {"id": "nmap_basic", "name": "Nmap Scanner", "type": "tool", "rarity": "common", "icon": "scan", "description": "Industry-standard port and network reconnaissance.", "stats": {"intelligence": 2}},
+            {"id": "cyber_armor", "name": "Cyber Armor", "type": "equipment", "slot": "body", "rarity": "epic", "icon": "shield", "description": "Carbon-weave with active firewall mesh.", "stats": {"defense": 12}},
+            {"id": "quantum_helmet", "name": "Quantum Helmet", "type": "equipment", "slot": "head", "rarity": "rare", "icon": "hardware-chip", "description": "Neural-interface helm.", "stats": {"intelligence": 6}},
+        ]
+        await db.characters.update_one({"user_id": user["id"]}, {"$set": {"inventory": items}})
+
+    equipment = char.get("equipment", {"head": "quantum_helmet", "body": "cyber_armor", "tool": "nmap_basic"})
+    return {"items": items, "equipment": equipment}
+
+
+@api.post("/inventory/equip")
+async def equip_item(payload: ItemUseIn, user=Depends(get_current_user)):
+    char = await db.characters.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not char:
+        raise HTTPException(status_code=404, detail="No character found")
+    
+    equipment = char.get("equipment", {})
+    equipment["tool"] = payload.item_id
+    await db.characters.update_one({"user_id": user["id"]}, {"$set": {"equipment": equipment}})
+    return {"success": True, "equipment": equipment}
+
+
+# ---------- Leaderboard Engine ----------
+@api.get("/leaderboard")
+async def get_leaderboard(user=Depends(get_current_user)):
+    cursor = db.characters.find({}, {"_id": 0}).sort([("level", -1), ("xp", -1), ("reputation", -1)]).limit(20)
+    players = await cursor.to_list(length=20)
+    
+    if not players:
+        players = [
+            {"name": "ZeroTrace", "level": 15, "xp": 7250, "reputation": 450, "cyber_class": "netrunner", "avatar_id": "avatar_1"},
+            {"name": "Vektor_Null", "level": 12, "xp": 5800, "reputation": 380, "cyber_class": "ghost", "avatar_id": "avatar_2"},
+            {"name": "Aegis_Shield", "level": 10, "xp": 4900, "reputation": 310, "cyber_class": "enforcer", "avatar_id": "avatar_3"},
+            {"name": "Cipher_Mobile", "level": 8, "xp": 3600, "reputation": 240, "cyber_class": "netrunner", "avatar_id": "avatar_4"},
+        ]
+
+    return {"leaderboard": players}
+
+
+# ---------- HackBay Engine ----------
+@api.get("/hackbay")
+async def get_hackbay(user=Depends(get_current_user)):
+    cursor = db.hack_sessions.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1)
+    sessions = await cursor.to_list(length=10)
+    
+    targets = [
+        {"id": "helix_core", "name": "Helix Corp Core Node", "difficulty": "Hard", "ice_level": 4, "reward_xp": 800},
+        {"id": "aether_relay", "name": "Aether Relay Subnet", "difficulty": "Medium", "ice_level": 2, "reward_xp": 450},
+        {"id": "kurogane_vault", "name": "Kurogane Quantum Vault", "difficulty": "Extreme", "ice_level": 5, "reward_xp": 1500},
+    ]
+    return {"targets": targets, "active_sessions": sessions}
 
 
 @api.post("/messenger/seed-tipoffs")

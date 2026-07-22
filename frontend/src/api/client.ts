@@ -1,6 +1,6 @@
 /**
- * API client for Shadow Nexus with dynamic LAN IP resolution and cloud failover.
- * Prevents "Network request failed" on physical mobile devices & Expo Go.
+ * API client for Shadow Nexus with dynamic LAN IP resolution and automatic token management.
+ * Prevents stale tokens, unauthorized mock fallbacks, and connection errors across physical devices & Expo Go.
  */
 import { Platform } from "react-native";
 import Constants from "expo-constants";
@@ -17,7 +17,7 @@ function getBaseUrl(): string {
     return `http://${host}:8001`;
   }
 
-  // Detect local IP of host computer via Expo Constants for physical phone/Expo Go
+  // Detect local IP of host computer via Expo Constants for physical phone / Expo Go
   const hostUri = Constants.expoConfig?.hostUri || (Constants as any).manifest?.debuggerHost || (Constants as any).manifest2?.extra?.expoGo?.developer?.manifest?.debuggerHost;
   if (hostUri) {
     const ip = hostUri.split(":")[0];
@@ -37,11 +37,17 @@ const TOKEN_KEY = "sn_token";
 
 export async function getToken(): Promise<string | null> {
   const token = await storage.secureGet<string>(TOKEN_KEY, "");
-  return token || null;
+  // Prevent any stale mock tokens from ever being sent to the real backend
+  if (!token || token === "mock_session_token_123") {
+    return null;
+  }
+  return token;
 }
 
 export async function setToken(token: string): Promise<void> {
-  await storage.secureSet(TOKEN_KEY, token);
+  if (token && token !== "mock_session_token_123") {
+    await storage.secureSet(TOKEN_KEY, token);
+  }
 }
 
 export async function clearToken(): Promise<void> {
@@ -62,7 +68,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     "Content-Type": "application/json",
     ...((init.headers as Record<string, string>) || {}),
   };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
   const primaryBase = getBaseUrl();
   const primaryUrl = `${primaryBase}/api${path}`;
@@ -71,15 +79,30 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const res = await fetch(primaryUrl, { ...init, headers });
     const text = await res.text();
     let data: any = null;
-    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = text;
+    }
+
     if (!res.ok) {
+      // Automatic token purge on 401 Unauthorized
+      if (res.status === 401) {
+        await clearToken();
+      }
       const msg = (data && (data.detail || data.message)) || res.statusText;
       throw new ApiError(typeof msg === "string" ? msg : "Request failed", res.status);
     }
     return data as T;
   } catch (primaryErr: any) {
-    // If local network request failed, attempt cloud failover
-    if (!primaryUrl.includes("onrender.com")) {
+    // If 401, throw directly without retrying or mocking
+    if (primaryErr instanceof ApiError && primaryErr.status === 401) {
+      await clearToken();
+      throw primaryErr;
+    }
+
+    // Attempt Render cloud failover if network was unreachable
+    if (!primaryUrl.includes("onrender.com") && !(primaryErr instanceof ApiError)) {
       const fallbackUrl = `https://shadow-backend-5amv.onrender.com/api${path}`;
       try {
         const res = await fetch(fallbackUrl, { ...init, headers });
@@ -87,88 +110,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
         let data: any = null;
         try { data = text ? JSON.parse(text) : null; } catch { data = text; }
         if (res.ok) return data as T;
-      } catch (fallbackErr) {
-        /* proceed to mock fallback */
+        if (res.status === 401) {
+          await clearToken();
+          throw new ApiError("Session expired", 401);
+        }
+      } catch (fallbackErr: any) {
+        if (fallbackErr instanceof ApiError && fallbackErr.status === 401) {
+          await clearToken();
+          throw fallbackErr;
+        }
       }
     }
 
-    // Mock fallback for dashboard if server is offline or local WiFi blocked
-    if (path === "/dashboard") {
-      return {
-        character: {
-          name: "Cipher_Mobile",
-          avatar_id: "avatar_1",
-          cyber_class: "penetration_tester",
-          reputation: 150,
-          coins: 100,
-          level: 1,
-        },
-        xp_progress: 0.35,
-        xp_to_next_level: 65,
-        current_mission: {
-          id: "m_demo_1",
-          title: "Infiltrate Mainframe Alpha",
-          story: "Establish a secure breach in the corporate perimeter node.",
-          difficulty: "Normal",
-          rewards: { xp: 100, coins: 50 },
-        },
-        daily_challenges: [
-          { id: "dc1", name: "System Hack", description: "Complete 1 terminal hack", progress: 1, target: 1, completed: true },
-          { id: "dc2", name: "Reputation Boost", description: "Earn 20 reputation points", progress: 10, target: 20, completed: false },
-        ]
-      } as unknown as T;
-    }
-
-    // Fallbacks for auth & character endpoints if local network is unreachable
-    if (path.includes("/auth/me")) {
-      return {
-        user: { id: "u_demo_1", username: "Agent_Operative", email: "agent@nexus.io" },
-        character: {
-          name: "Cipher_Mobile",
-          avatar_id: "avatar_1",
-          cyber_class: "netrunner",
-          reputation: 150,
-          coins: 100,
-          level: 1,
-        },
-      } as unknown as T;
-    }
-
-    if (path.includes("/auth/register") || path.includes("/auth/login")) {
-      return {
-        token: "mock_session_token_123",
-        user: { id: "u_demo_1", username: "Agent_Operative", email: "agent@nexus.io" },
-        has_character: true,
-      } as unknown as T;
-    }
-
-    if (path.includes("/character/options")) {
-      return {
-        avatars: [
-          { id: "avatar_1", icon: "shield-checkmark", color: "#00F0FF" },
-          { id: "avatar_2", icon: "flash", color: "#00FF66" },
-          { id: "avatar_3", icon: "hardware-chip", color: "#A855F7" },
-          { id: "avatar_4", icon: "terminal", color: "#F59E0B" },
-        ],
-        classes: [
-          { id: "netrunner", name: "Netrunner", icon: "terminal", color: "#00F0FF", description: "Master of cyberspace intrusion & decryption.", starting_stats: { int: 15, dex: 12 }, bonus: "Fast Hacking" },
-          { id: "enforcer", name: "Enforcer", icon: "shield", color: "#00FF66", description: "Heavy combat & firewall defense specialist.", starting_stats: { str: 16, con: 14 }, bonus: "Heavy Shielding" },
-          { id: "ghost", name: "Ghost", icon: "eye-off", color: "#A855F7", description: "Stealth operative & electronic sabotage expert.", starting_stats: { dex: 16, int: 13 }, bonus: "Stealth Cloak" },
-        ],
-      } as unknown as T;
-    }
-
-    if (path === "/character") {
-      return {
-        name: "Cipher_Mobile",
-        avatar_id: "avatar_1",
-        cyber_class: "netrunner",
-        reputation: 150,
-        coins: 100,
-        level: 1,
-      } as unknown as T;
-    }
-
+    // Re-throw genuine network or API errors
     throw primaryErr;
   }
 }
