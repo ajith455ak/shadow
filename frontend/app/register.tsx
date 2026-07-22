@@ -65,6 +65,19 @@ export default function RegisterScreen() {
     }
   };
 
+  const onDemoRegister = async () => {
+    setErr(null);
+    setLoading(true);
+    try {
+      await register("Agent_Zero", "agent@nexus.io", "Demo1234!");
+      router.replace({ pathname: "/verify-email", params: { email: "agent@nexus.io" } });
+    } catch (e: any) {
+      setErr(e?.message || "Demo signup failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <View style={styles.mobileRoot}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
@@ -156,13 +169,21 @@ export default function RegisterScreen() {
               </View>
             ) : null}
 
-            <View style={{ marginTop: 24 }}>
+            <View style={{ marginTop: 24, gap: 10 }}>
               <NeonButton
                 testID="register-submit-button"
                 label={loading ? "INITIALIZING..." : "REGISTER OPERATIVE"}
                 onPress={submit}
                 color={COLORS.purple}
                 variant="solid"
+                disabled={loading}
+              />
+              <NeonButton
+                testID="register-demo-button"
+                label="⚡ QUICK DEMO SIGNUP"
+                onPress={onDemoRegister}
+                color={COLORS.cyan}
+                variant="outline"
                 disabled={loading}
               />
             </View>
